@@ -181,8 +181,8 @@ export function Header({ eyebrow, title, right }: { eyebrow?: string; title: str
   return (
     <div className="flex items-end justify-between px-6 pb-4 pt-[calc(var(--safe-top)+28px)]">
       <div>
-        {eyebrow && <div className="caps mb-2">{eyebrow}</div>}
-        <h1 className="title-serif text-[38px]">{title}</h1>
+        <h1 className="title-serif text-[36px]">{title}</h1>
+        {eyebrow && <div className="mt-1.5 text-[13px] text-creme/55">{eyebrow}</div>}
       </div>
       {right}
     </div>

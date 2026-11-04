@@ -72,7 +72,7 @@ export function Stylist({ tryLook }: { tryLook: (l: { itemIds: string[] }) => vo
 
   return (
     <div className="flex min-h-full flex-col pb-28">
-      <Header eyebrow="Personal stylist" title="Stylist" />
+      <Header eyebrow="Des tenues pensées pour toi, avec tes vêtements." title="Mon styliste" />
       <div className="flex-1 px-6">
         {msgs.length === 0 ? (
           <div>

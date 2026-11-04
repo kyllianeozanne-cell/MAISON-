@@ -44,9 +44,39 @@ function GarmentRow({ g, sub }: { g: Garment; sub: string }) {
   )
 }
 
+const GROUP_LABEL: Record<string, string> = { top: 'Hauts', bottom: 'Bas', outer: 'Vestes', suit: 'Costumes', shoes: 'Chaussures', accessory: 'Accessoires' }
+function Donut({ data }: { data: { label: string; n: number }[] }) {
+  const total = data.reduce((a, d) => a + d.n, 0) || 1
+  const shades = ['#E8DFD0', '#C5AD83', '#8f7d5d', '#5e5340', '#3a342b', '#2a2622']
+  const C = 2 * Math.PI * 52
+  let acc = 0
+  return (
+    <div className="flex items-center gap-6">
+      <svg viewBox="0 0 140 140" className="h-36 w-36 shrink-0 -rotate-90">
+        <circle cx="70" cy="70" r="52" fill="none" stroke="#191918" strokeWidth="22" />
+        {data.map((d, i) => {
+          const len = (d.n / total) * C
+          const el = <circle key={d.label} cx="70" cy="70" r="52" fill="none" stroke={shades[i % shades.length]} strokeWidth="22" strokeDasharray={`${Math.max(0, len - 1.5)} ${C}`} strokeDashoffset={-acc} />
+          acc += len
+          return el
+        })}
+      </svg>
+      <div className="flex-1 space-y-2">
+        {data.map((d, i) => (
+          <div key={d.label} className="flex items-center justify-between text-[12px]">
+            <span className="flex items-center gap-2 text-ivoire"><ColorDot color={shades[i % shades.length]} size={9} />{d.label}</span>
+            <span className="text-creme/50">{Math.round((d.n / total) * 100)} %</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ---------- Statistiques ---------- */
 function Stats() {
   const all = useStore((s) => s.garments)
+  const outfitCount = useStore((s) => s.outfits.length)
   const g = all.filter((x) => x.status !== 'archived')
   const top = (keyFn: (x: Garment) => string, n = 6, hex?: (x: Garment) => string) => {
     const m = new Map<string, { n: number; color?: string }>()
@@ -63,11 +93,12 @@ function Stats() {
   return (
     <div>
       <div className="mb-5 grid grid-cols-3 gap-3">
-        {[['Pièces', String(g.length)], ['Valeur', priced.length ? eur(total) : '—'], ['€ / port', perWear != null ? eur(Math.round(perWear)) : '—']].map(([k, v]) => (
+        {[['Pièces', String(g.length)], ['Tenues', String(outfitCount)], ['Marques', String(new Set(g.map((x) => x.brand).filter(Boolean)).size)]].map(([k, v]) => (
           <div key={k} className="card p-4 text-center"><div className="title-serif text-[26px]">{v}</div><div className="caps mt-1 !text-[9px]">{k}</div></div>
         ))}
       </div>
-      <Block title="Par catégorie"><Bars data={top((x) => CAT_BY_ID[x.category].label, 8)} /></Block>
+      <Block title="Répartition par catégorie"><Donut data={top((x) => GROUP_LABEL[slotOf(x.category)], 6)} /></Block>
+      <Block title="Valeur du dressing"><div className="flex justify-between text-[13px] text-ivoire"><span>{priced.length ? eur(total) : 'Prix non renseignés'}</span><span className="text-creme/50">{perWear != null ? `${eur(Math.round(perWear))} par port` : ''}</span></div></Block>
       <Block title="Couleurs dominantes"><Bars data={top((x) => colorName(x.color), 6, (x) => x.color)} /></Block>
       <Block title="Marques"><Bars data={top((x) => x.brand, 6)} /></Block>
       <Block title="Les plus portées">{most.length ? most.map((x) => <GarmentRow key={x.id} g={x} sub={`${x.wornDates.length}×`} />) : <p className="text-[12px] text-creme/45">Enregistre tes tenues dans le calendrier.</p>}</Block>
@@ -316,7 +347,7 @@ export function Profile() {
   const name = useStore((s) => s.settings.name)
   return (
     <div className="pb-32">
-      <Header eyebrow={name || 'Mon espace'} title="Profile" />
+      <Header eyebrow={name || 'Ton style, ton identité.'} title="Mon profil" />
       <div className="px-6">
         <div className="mb-6"><Segmented<Sub> value={sub} onChange={setSub} options={[{ id: 'stats', label: 'Stats' }, { id: 'calendar', label: 'Calendrier' }, { id: 'trip', label: 'Valise' }, { id: 'wish', label: 'Wishlist' }, { id: 'capsule', label: 'Capsules' }, { id: 'settings', label: 'Réglages' }]} /></div>
         {sub === 'stats' && <Stats />}

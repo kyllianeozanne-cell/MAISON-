@@ -4,14 +4,15 @@ import { AddGarmentSheet } from '../components/AddGarment'
 import { GarmentDetail } from '../components/GarmentDetail'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { ColorDot, Empty, Header, Icon, Sheet, useDebounced, toast } from '../components/ui'
-import { CATEGORIES, CAT_BY_ID, SEASONS, STYLES, MATERIALS } from '../lib/constants'
+import { CATEGORIES, CAT_BY_ID, SEASONS, STYLES, MATERIALS, slotOf } from '../lib/constants'
 import { colorName } from '../lib/colors'
 import { demoGarments } from '../lib/demo'
 import { useStore } from '../lib/store'
 import { cx } from '../lib/utils'
-import type { CategoryId, Garment, Season, Style } from '../types'
+import type { CategoryId, Garment, Season, Slot, Style } from '../types'
 
 interface Filters {
+  cats: CategoryId[]
   colors: string[]
   brands: string[]
   seasons: Season[]
@@ -22,15 +23,17 @@ interface Filters {
   showArchived: boolean
   onlyLaundry: boolean
 }
-const NO_FILTERS: Filters = { colors: [], brands: [], seasons: [], materials: [], styles: [], price: '', freq: '', showArchived: false, onlyLaundry: false }
+const NO_FILTERS: Filters = { cats: [], colors: [], brands: [], seasons: [], materials: [], styles: [], price: '', freq: '', showArchived: false, onlyLaundry: false }
+const GROUPS: { id: Slot; label: string }[] = [{ id: 'top', label: 'Hauts' }, { id: 'bottom', label: 'Bas' }, { id: 'outer', label: 'Vestes' }, { id: 'suit', label: 'Costumes' }, { id: 'shoes', label: 'Chaussures' }, { id: 'accessory', label: 'Accessoires' }]
 
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 const tg = <T,>(a: T[], v: T) => (a.includes(v) ? a.filter((x) => x !== v) : [...a, v])
 
-function matches(g: Garment, f: Filters, cat: CategoryId | 'all', q: string): boolean {
+function matches(g: Garment, f: Filters, grp: Slot | 'all', q: string): boolean {
   if (g.status === 'archived' && !f.showArchived) return false
   if (f.onlyLaundry && g.status !== 'laundry') return false
-  if (cat !== 'all' && g.category !== cat) return false
+  if (grp !== 'all' && slotOf(g.category) !== grp) return false
+  if (f.cats.length && !f.cats.includes(g.category)) return false
   if (q) {
     const hay = norm([g.name, g.brand, g.subcategory, g.material, g.notes, colorName(g.color), CAT_BY_ID[g.category].label, g.styles.join(' ')].join(' '))
     if (!q.split(/\s+/).every((w) => hay.includes(w))) return false
@@ -77,7 +80,7 @@ function ChipGroup<T extends string>({ label, options, value, onToggle }: { labe
 export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void }) {
   const garments = useStore((s) => s.garments)
   const addGarment = useStore((s) => s.addGarment)
-  const [cat, setCat] = useState<CategoryId | 'all'>('all')
+  const [cat, setCat] = useState<Slot | 'all'>('all')
   const [query, setQuery] = useState('')
   const q = useDebounced(norm(query.trim()), 150)
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
@@ -85,14 +88,14 @@ export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void 
   const [addOpen, setAddOpen] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
 
-  const present = useMemo(() => new Set(garments.filter((g) => g.status !== 'archived').map((g) => g.category)), [garments])
-  const cats = CATEGORIES.filter((c) => present.has(c.id))
+  const present = useMemo(() => new Set(garments.filter((g) => g.status !== 'archived').map((g) => slotOf(g.category))), [garments])
+  const groups = GROUPS.filter((x) => present.has(x.id))
   const list = useMemo(() => garments.filter((g) => matches(g, filters, cat, q)), [garments, filters, cat, q])
   const brands = useMemo(() => Array.from(new Set(garments.map((g) => g.brand).filter(Boolean))).sort(), [garments])
   const colors = useMemo(() => Array.from(new Set(garments.map((g) => colorName(g.color)))).sort(), [garments])
   const colorHex = (n: string) => garments.find((g) => colorName(g.color) === n)?.color ?? '#888'
   const activeCount =
-    filters.colors.length + filters.brands.length + filters.seasons.length + filters.materials.length + filters.styles.length +
+    filters.cats.length + filters.colors.length + filters.brands.length + filters.seasons.length + filters.materials.length + filters.styles.length +
     (filters.price ? 1 : 0) + (filters.freq ? 1 : 0) + (filters.showArchived ? 1 : 0) + (filters.onlyLaundry ? 1 : 0)
   const opened = garments.find((g) => g.id === openId) ?? null
   const active = garments.filter((g) => g.status !== 'archived').length
@@ -106,7 +109,7 @@ export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void 
     <div className="pb-32">
       <Header
         eyebrow={`${active} pièce${active > 1 ? 's' : ''}`}
-        title="Wardrobe"
+        title="Mon dressing"
         right={
           <button onClick={() => setAddOpen(true)} className="flex h-12 w-12 items-center justify-center rounded-full bg-champagne text-noir shadow-depth active:scale-95" aria-label="Ajouter une pièce">
             <Icon name="plus" size={22} stroke={1.4} />
@@ -140,8 +143,8 @@ export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void 
           </div>
 
           <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto px-6">
-            <button onClick={() => setCat('all')} className={cx('chip', cat === 'all' && 'chip-on')}>Tout</button>
-            {cats.map((c) => (
+            <button onClick={() => setCat('all')} className={cx('chip', cat === 'all' && 'chip-on')}>Tous</button>
+            {groups.map((c) => (
               <button key={c.id} onClick={() => setCat(c.id)} className={cx('chip', cat === c.id && 'chip-on')}>{c.label}</button>
             ))}
           </div>
@@ -152,7 +155,7 @@ export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void 
               action={<button onClick={() => { setFilters(NO_FILTERS); setQuery(''); setCat('all') }} className="btn-ghost">Réinitialiser</button>}
             />
           ) : (
-            <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-7 px-6">
+            <div className="mt-6 grid grid-cols-3 gap-x-3 gap-y-6 px-5">
               {list.map((g, i) => (
                 <motion.button
                   key={g.id}
@@ -172,7 +175,7 @@ export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void 
                     <ColorDot color={g.color} size={9} />
                     <span className="caps !text-creme/45">{g.brand || CAT_BY_ID[g.category].label}</span>
                   </div>
-                  <div className="mt-1 line-clamp-2 font-serif text-[18px] leading-tight text-ivoire">{g.name}</div>
+                  <div className="mt-1 line-clamp-2 font-serif text-[14.5px] leading-tight text-ivoire">{g.name}</div>
                 </motion.button>
               ))}
             </div>
@@ -181,6 +184,7 @@ export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void 
       )}
 
       <Sheet open={filterOpen} onClose={() => setFilterOpen(false)} title="Filtres" tall>
+        <ChipGroup label="Catégorie" options={CATEGORIES.map((c) => ({ id: c.id, label: c.label }))} value={filters.cats} onToggle={(v) => setFilters((f) => ({ ...f, cats: tg(f.cats, v) }))} />
         <ChipGroup label="Couleur" options={colors.map((c) => ({ id: c, label: c }))} value={filters.colors} onToggle={(v) => setFilters((f) => ({ ...f, colors: tg(f.colors, v) }))} />
         <ChipGroup label="Marque" options={brands.map((b) => ({ id: b, label: b }))} value={filters.brands} onToggle={(v) => setFilters((f) => ({ ...f, brands: tg(f.brands, v) }))} />
         <ChipGroup label="Saison" options={SEASONS} value={filters.seasons} onToggle={(v) => setFilters((f) => ({ ...f, seasons: tg(f.seasons, v) }))} />

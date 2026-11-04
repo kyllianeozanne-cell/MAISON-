@@ -32,7 +32,7 @@ function Welcome() {
     <div className="flex h-full flex-col justify-between px-8 pb-[calc(var(--safe-bottom)+40px)] pt-[calc(var(--safe-top)+80px)]">
       <div>
         <div className="font-serif text-[15px] font-light tracking-[0.55em] text-champagne">MAISON</div>
-        <h1 className="title-serif mt-10 text-[54px]">Your private wardrobe.</h1>
+        <h1 className="title-serif mt-10 text-[54px]">Ton dressing privé.</h1>
         <p className="mt-5 max-w-[320px] font-serif text-[21px] italic leading-snug text-creme/60">Chaque pièce, chaque tenue, composées avec soin.</p>
       </div>
       <div>

@@ -320,11 +320,11 @@ export function missingForOutfit(garments: Garment[]): string[] {
 
 export function homeSelections(garments: Garment[], w: Weather | null): Look[] {
   const defs: { title: string; req: StyleRequest }[] = [
-    { title: 'Today’s outfit', req: { context: 'quotidien', tone: 'default', mustInclude: [] } },
-    { title: 'Old Money Look', req: { context: 'rendez-vous', tone: 'oldmoney', mustInclude: [] } },
-    { title: 'Casual Elegance', req: { context: 'quotidien', tone: 'smart', mustInclude: [] } },
-    { title: 'Evening Selection', req: { context: 'soiree', tone: 'formal', mustInclude: [] } },
-    { title: 'Weekend Outfit', req: { context: 'weekend', tone: 'casual', mustInclude: [] } },
+    { title: 'Tenue du jour', req: { context: 'quotidien', tone: 'default', mustInclude: [] } },
+    { title: 'Look old money', req: { context: 'rendez-vous', tone: 'oldmoney', mustInclude: [] } },
+    { title: 'Élégance décontractée', req: { context: 'quotidien', tone: 'smart', mustInclude: [] } },
+    { title: 'Sélection du soir', req: { context: 'soiree', tone: 'formal', mustInclude: [] } },
+    { title: 'Tenue week-end', req: { context: 'weekend', tone: 'casual', mustInclude: [] } },
   ]
   const used: string[] = []
   const looks: Look[] = []
@@ -353,7 +353,7 @@ export function parseIntent(text: string, garments: Garment[]): ParsedIntent {
   const t = norm(text)
   let context: Context = 'quotidien'
   let tone: Tone = 'default'
-  let label = 'Today’s selection'
+  let label = 'Tenue du jour'
 
   if (/rendez|date\b|diner en amoureux/.test(t)) { context = 'rendez-vous'; label = 'Rendez-vous' }
   else if (/travail|bureau|boulot|reunion|entretien|client/.test(t)) { context = 'travail'; label = 'Au travail' }
@@ -362,7 +362,7 @@ export function parseIntent(text: string, garments: Garment[]): ParsedIntent {
   else if (/vacances|voyage|plage/.test(t)) { context = 'vacances'; label = 'Vacances' }
 
   if (/old money|vieille fortune/.test(t)) { tone = 'oldmoney'; label = 'Old Money' }
-  else if (/sans etre trop habille|smart casual|chic decontract|elegant sans/.test(t)) { tone = 'smart'; label = 'Casual Elegance' }
+  else if (/sans etre trop habille|smart casual|chic decontract|elegant sans/.test(t)) { tone = 'smart'; label = 'Élégance décontractée' }
   else if (/decontract|casual|relax|cool|simple|confort/.test(t)) { tone = 'casual'; label = 'Plus décontracté' }
   else if (/formel|habille|ceremonie|mariage|costume|chic/.test(t)) { tone = 'formal'; label = 'Tenue habillée' }
 

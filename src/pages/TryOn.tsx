@@ -84,7 +84,7 @@ export function TryOn({ goStylist }: { goStylist: () => void }) {
   if (garments.length === 0) {
     return (
       <div className="pb-32">
-        <Header eyebrow="Fitting room" title="Try on" />
+        <Header eyebrow="Compose tes tenues sur ton avatar" title="Essayage" />
         <Empty icon="avatar" title="Rien à essayer encore" text="Ajoute des pièces à ton dressing pour les voir sur ton avatar." action={<button className="btn-ghost" onClick={() => setEditor(true)}>Régler mon avatar</button>} />
         <AvatarEditor open={editor} onClose={() => setEditor(false)} />
       </div>
@@ -94,8 +94,8 @@ export function TryOn({ goStylist }: { goStylist: () => void }) {
   return (
     <div className="pb-32">
       <Header
-        eyebrow="Fitting room"
-        title="Try on"
+        eyebrow="Compose tes tenues sur ton avatar"
+        title="Essayage"
         right={<button onClick={() => setEditor(true)} className="btn-ghost !px-4 !py-2.5"><Icon name="edit" size={14} /> Avatar</button>}
       />
 
