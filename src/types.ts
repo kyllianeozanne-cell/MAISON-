@@ -31,7 +31,15 @@ export interface Garment {
   photo: string // data URL (peut être vide)
   wornDates: string[]
   status: Status
+  favorite?: boolean
   createdAt: number
+}
+
+export interface Fit {
+  x: number
+  y: number
+  s: number
+  r?: number
 }
 
 export interface Outfit {
@@ -41,6 +49,7 @@ export interface Outfit {
   favorite: boolean
   context: Context | ''
   note: string
+  fit?: Record<string, Fit>
   createdAt: number
 }
 
@@ -82,7 +91,8 @@ export interface AvatarConfig {
   beard: 'none' | 'stubble' | 'short' | 'full'
   underwear: 'beige' | 'noir'
   photo: string // photo en pied (data URL), stockée sur l'appareil
-  fit: Partial<Record<Slot, { x: number; y: number; s: number }>>
+  fit: Record<string, Fit>
+  neck?: number // ligne du cou (fraction de la hauteur de la photo)
 }
 
 export interface GeoPoint {
@@ -96,6 +106,9 @@ export interface Settings {
   location: GeoPoint | null
   notifications: boolean
   aiEnabled: boolean
+  favStyles?: Style[]
+  favColors?: string[]
+  sizes?: { top: string; bottom: string; shoes: string }
 }
 
 export interface Weather {
@@ -118,5 +131,7 @@ export interface Look {
   itemIds: string[]
   reason: string
   score: number // 0..100 compat météo
+  harmony?: number // 0..100 harmonie des couleurs
+  match?: number // 0..100 score global
   context: Context
 }

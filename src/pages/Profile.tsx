@@ -3,8 +3,8 @@ import { LocationPicker } from '../components/LocationPicker'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { OutfitCollage } from '../components/Look'
 import { ColorDot, Empty, Header, Icon, Segmented, Sheet, toast } from '../components/ui'
-import { CATEGORIES, CAT_BY_ID, slotOf } from '../lib/constants'
-import { colorName } from '../lib/colors'
+import { CATEGORIES, CAT_BY_ID, STYLES, slotOf } from '../lib/constants'
+import { colorName, NAMED_COLORS } from '../lib/colors'
 import { aiConfigured } from '../lib/ai'
 import { demoGarments } from '../lib/demo'
 import { supabase } from '../lib/supabase'
@@ -14,7 +14,7 @@ import { fetchTripWeather } from '../lib/weather'
 import { cx, eur, parseYmd, ymd } from '../lib/utils'
 import type { CategoryId, Garment, GeoPoint } from '../types'
 
-type Sub = 'stats' | 'calendar' | 'trip' | 'wish' | 'capsule' | 'settings'
+type Sub = 'stats' | 'style' | 'calendar' | 'trip' | 'wish' | 'capsule' | 'settings'
 
 function Bars({ data }: { data: { label: string; n: number; color?: string }[] }) {
   const max = Math.max(1, ...data.map((d) => d.n))
@@ -342,6 +342,23 @@ function Settings() {
   )
 }
 
+function Prefs() {
+  const { settings, setSettings } = useStore()
+  const styles = settings.favStyles ?? []
+  const colors = settings.favColors ?? []
+  const sizes = settings.sizes ?? { top: '', bottom: '', shoes: '' }
+  const tg = <T,>(a: T[], v: T) => (a.includes(v) ? a.filter((x) => x !== v) : [...a, v])
+  const labels = { top: 'Haut', bottom: 'Bas', shoes: 'Chaussures' }
+  return (
+    <div>
+      <Block title="Styles favoris"><div className="flex flex-wrap gap-2">{STYLES.map((s) => <button key={s} onClick={() => setSettings({ favStyles: tg(styles, s) })} className={cx('chip', styles.includes(s) && 'chip-on')}>{s}</button>)}</div></Block>
+      <Block title="Couleurs préférées"><div className="flex flex-wrap gap-3">{NAMED_COLORS.map((c) => <button key={c.name} onClick={() => setSettings({ favColors: tg(colors, c.name) })} aria-label={c.name}><ColorDot color={c.hex} size={28} ring={colors.includes(c.name)} /></button>)}</div></Block>
+      <Block title="Mes tailles"><div className="grid grid-cols-3 gap-3">{(['top', 'bottom', 'shoes'] as const).map((k) => <input key={k} className="field" placeholder={labels[k]} value={sizes[k]} onChange={(e) => setSettings({ sizes: { ...sizes, [k]: e.target.value } })} />)}</div></Block>
+      <p className="px-1 text-[11.5px] leading-relaxed text-creme/40">Le styliste et les recommandations privilégient ces choix.</p>
+    </div>
+  )
+}
+
 export function Profile() {
   const [sub, setSub] = useState<Sub>('stats')
   const name = useStore((s) => s.settings.name)
@@ -349,8 +366,9 @@ export function Profile() {
     <div className="pb-32">
       <Header eyebrow={name || 'Ton style, ton identité.'} title="Mon profil" />
       <div className="px-6">
-        <div className="mb-6"><Segmented<Sub> value={sub} onChange={setSub} options={[{ id: 'stats', label: 'Stats' }, { id: 'calendar', label: 'Calendrier' }, { id: 'trip', label: 'Valise' }, { id: 'wish', label: 'Wishlist' }, { id: 'capsule', label: 'Capsules' }, { id: 'settings', label: 'Réglages' }]} /></div>
+        <div className="mb-6"><Segmented<Sub> value={sub} onChange={setSub} options={[{ id: 'stats', label: 'Stats' }, { id: 'style', label: 'Mon style' }, { id: 'calendar', label: 'Calendrier' }, { id: 'trip', label: 'Valise' }, { id: 'wish', label: 'Wishlist' }, { id: 'capsule', label: 'Capsules' }, { id: 'settings', label: 'Réglages' }]} /></div>
         {sub === 'stats' && <Stats />}
+        {sub === 'style' && <Prefs />}
         {sub === 'calendar' && <CalendarView />}
         {sub === 'trip' && <Trip />}
         {sub === 'wish' && <Wish />}

@@ -3,9 +3,7 @@ import { Silhouette } from './GarmentThumb'
 import { cutoutDataUrl } from '../lib/photo'
 import { slotOf } from '../lib/constants'
 import { clamp, cx } from '../lib/utils'
-import type { AvatarConfig, Garment, Slot } from '../types'
-
-export type Fit = { x: number; y: number; s: number }
+import type { AvatarConfig, Fit, Garment, Slot } from '../types'
 
 const DEFAULT_FIT: Partial<Record<Slot, Fit>> = {
   top: { x: 0.5, y: 0.17, s: 0.44 },
@@ -14,7 +12,8 @@ const DEFAULT_FIT: Partial<Record<Slot, Fit>> = {
   bottom: { x: 0.5, y: 0.46, s: 0.36 },
   shoes: { x: 0.5, y: 0.88, s: 0.34 },
 }
-export const fitOf = (fit: AvatarConfig['fit'] | undefined, slot: Slot): Fit => fit?.[slot] ?? DEFAULT_FIT[slot] ?? { x: 0.5, y: 0.5, s: 0.3 }
+export const fitOf = (fit: AvatarConfig['fit'] | undefined, g: Garment): Fit =>
+  fit?.[g.id] ?? DEFAULT_FIT[slotOf(g.category)] ?? { x: 0.5, y: 0.5, s: 0.3 }
 const Z: Record<string, number> = { bottom: 1, shoes: 2, top: 3, suit: 4, outer: 5 }
 
 const results = new Map<string, string>()
@@ -41,50 +40,81 @@ function useCutouts(items: Garment[]) {
   return (g: Garment) => (g.photo ? results.get(keyOf(g)) ?? '' : '')
 }
 
-export function PhotoAvatar({
-  photo, items, fit, selected, onFit,
-}: { photo: string; items: Garment[]; fit: AvatarConfig['fit'] | undefined; selected?: Slot | null; onFit?: (slot: Slot, f: Fit) => void }) {
+interface Props {
+  photo: string
+  items: Garment[]
+  fit: AvatarConfig['fit'] | undefined
+  neck: number
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+  onFit: (id: string, f: Fit) => void
+  onStart: () => void
+}
+
+export function PhotoAvatar({ photo, items, fit, neck, selectedId, onSelect, onFit, onStart }: Props) {
   const box = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ slot: Slot; px: number; py: number; f: Fit } | null>(null)
+  const drag = useRef<{ id: string; px: number; py: number; f: Fit; moved: boolean } | null>(null)
   const [ratio, setRatio] = useState(0.6)
   const cut = useCutouts(items)
   const layers = items
     .filter((g) => slotOf(g.category) !== 'accessory')
     .sort((a, b) => (Z[slotOf(a.category)] ?? 0) - (Z[slotOf(b.category)] ?? 0))
 
-  const down = (e: React.PointerEvent, slot: Slot) => {
-    if (!onFit || selected !== slot) return
+  const down = (e: React.PointerEvent, g: Garment) => {
+    e.stopPropagation()
     ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
-    drag.current = { slot, px: e.clientX, py: e.clientY, f: fitOf(fit, slot) }
+    onSelect(g.id)
+    drag.current = { id: g.id, px: e.clientX, py: e.clientY, f: fitOf(fit, g), moved: false }
   }
   const move = (e: React.PointerEvent) => {
     const d = drag.current
     const el = box.current
-    if (!d || !el || !onFit) return
+    if (!d || !el) return
     const r = el.getBoundingClientRect()
-    onFit(d.slot, { ...d.f, x: clamp(d.f.x + (e.clientX - d.px) / r.width, 0, 1), y: clamp(d.f.y + (e.clientY - d.py) / r.height, -0.2, 1) })
+    const dx = e.clientX - d.px
+    const dy = e.clientY - d.py
+    if (!d.moved) {
+      if (Math.abs(dx) + Math.abs(dy) < 4) return
+      d.moved = true
+      onStart()
+    }
+    onFit(d.id, { ...d.f, x: clamp(d.f.x + dx / r.width, 0, 1), y: clamp(d.f.y + dy / r.height, -0.2, 1) })
   }
   const up = () => { drag.current = null }
 
   return (
     <div className="flex h-full items-center justify-center">
-      <div ref={box} className="relative h-full select-none overflow-hidden" style={{ aspectRatio: String(ratio) }} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+      <div
+        ref={box}
+        className="relative h-full select-none overflow-hidden"
+        style={{ aspectRatio: String(ratio) }}
+        onPointerDown={() => onSelect(null)}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+      >
         <img src={photo} alt="Ma photo" draggable={false} className="block h-full w-full object-cover" onLoad={(e) => setRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)} />
-        {layers.map((g) => {
-          const slot = slotOf(g.category)
-          const f = fitOf(fit, slot)
-          const src = cut(g)
-          return (
-            <div
-              key={g.id}
-              onPointerDown={(e) => down(e, slot)}
-              className={cx('absolute', selected === slot && 'outline-dashed outline-1 outline-champagne')}
-              style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.s * 100}%`, transform: 'translateX(-50%)', zIndex: Z[slot] ?? 1, touchAction: selected === slot ? 'none' : 'auto', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.35))' }}
-            >
-              {g.photo ? (src ? <img src={src} alt="" draggable={false} className="pointer-events-none block w-full" /> : null) : <Silhouette category={g.category} color={g.color} className="block w-full" />}
-            </div>
-          )
-        })}
+        <div className="absolute inset-0" style={{ clipPath: `inset(${neck * 100}% 0 0 0)` }}>
+          {layers.map((g) => {
+            const slot = slotOf(g.category)
+            const f = fitOf(fit, g)
+            const src = cut(g)
+            return (
+              <div
+                key={g.id}
+                onPointerDown={(e) => down(e, g)}
+                className={cx('absolute', selectedId === g.id && 'outline-dashed outline-1 outline-champagne')}
+                style={{
+                  left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.s * 100}%`,
+                  transform: `translateX(-50%) rotate(${f.r ?? 0}deg)`, zIndex: Z[slot] ?? 1,
+                  touchAction: 'none', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.35))',
+                }}
+              >
+                {g.photo ? (src ? <img src={src} alt="" draggable={false} className="pointer-events-none block w-full" /> : null) : <Silhouette category={g.category} color={g.color} className="pointer-events-none block w-full" />}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

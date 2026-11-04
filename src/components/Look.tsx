@@ -84,7 +84,7 @@ export function LookRow({ look, garments, onTry, temp }: { look: Look; garments:
       <OutfitCollage items={items} className="w-[36%] shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <div className="font-serif text-[22px] leading-tight text-ivoire">{look.title}</div>
-        {temp != null && <div className="mt-1 text-[12px] text-creme/55">{temp}°C · compatibilité {look.score} %</div>}
+        {(temp != null || look.harmony != null) && <div className="mt-1 text-[12px] text-creme/55">{temp != null ? `${temp}°C · ` : ''}Météo {look.score} % · Harmonie {look.harmony ?? '—'} %</div>}
         <p className="mt-2 line-clamp-3 text-[11.5px] leading-snug text-creme/50">{look.reason}</p>
       </div>
       <Icon name="chevron" size={18} className="self-center text-champagne" />

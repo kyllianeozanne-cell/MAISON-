@@ -1,5 +1,5 @@
 import { CAT_BY_ID, slotOf, season as currentSeason } from './constants'
-import { colorFamily, colorName, isNeutral, paletteHarmony } from './colors'
+import { colorFamily, colorName, harmony, isNeutral, paletteHarmony } from './colors'
 import { isWet } from './weather'
 import { clamp, daysBetween, parseYmd, shuffle, uid, ymd } from './utils'
 import type { Context, Garment, Look, Season, Slot, Weather } from '../types'
@@ -10,6 +10,7 @@ export interface StyleRequest {
   context: Context
   tone: Tone
   mustInclude: string[] // ids de pièces imposées
+  prefs?: { styles: string[]; colors: string[] } // préférences de l'utilisateur
   avoidIds?: string[] // ids à éviter (ex : « une autre combinaison »)
   count?: number
   date?: Date
@@ -74,6 +75,9 @@ interface Candidate {
   items: Garment[]
   score: number
   weatherScore: number
+  colorScore: number
+  formalityScore: number
+  seasonScore: number
 }
 
 function bySlot(garments: Garment[]): Record<Slot, Garment[]> {
@@ -168,10 +172,17 @@ function scoreCandidate(items: Garment[], w: Weather | null, req: StyleRequest, 
     novelty = 1 - overlap / Math.max(1, items.length)
   }
 
+  const pf = req.prefs
+  let prefScore = 0.5
+  if (pf && (pf.styles.length || pf.colors.length)) {
+    const sHit = pf.styles.length ? body.filter((g) => g.styles.some((x) => pf.styles.includes(x))).length / body.length : 0.5
+    const cHit = pf.colors.length ? body.filter((g) => pf.colors.includes(colorName(g.color))).length / body.length : 0.5
+    prefScore = (sHit + cHit) / 2
+  }
   const score =
     weatherScore * 0.3 + colorScore * 0.24 + formalityScore * 0.2 + seasonScore * 0.1 +
-    styleScore * 0.08 + rotation * 0.08
-  return { items, score: score * (0.6 + 0.4 * novelty), weatherScore }
+    styleScore * 0.08 + rotation * 0.08 + prefScore * 0.08
+  return { items, score: score * (0.6 + 0.4 * novelty), weatherScore, colorScore, formalityScore, seasonScore }
 }
 
 export function buildCandidates(garments: Garment[], w: Weather | null, req: StyleRequest, tries = 500): Candidate[] {
@@ -301,6 +312,8 @@ export function suggest(garments: Garment[], w: Weather | null, req: StyleReques
     itemIds: c.items.map((g) => g.id),
     reason: explain(c.items, w, req),
     score: Math.round(c.weatherScore * 100),
+    harmony: Math.round(c.colorScore * 100),
+    match: Math.round(((0.3 * c.colorScore + 0.25 * c.formalityScore + 0.15 * c.seasonScore + (w ? 0.3 * c.weatherScore : 0)) / (w ? 1 : 0.7)) * 100),
     context: req.context,
   }))
 }
@@ -318,7 +331,7 @@ export function missingForOutfit(garments: Garment[]): string[] {
 
 /* ---------- Sélections nommées pour l'accueil ---------- */
 
-export function homeSelections(garments: Garment[], w: Weather | null): Look[] {
+export function homeSelections(garments: Garment[], w: Weather | null, prefs?: StyleRequest['prefs']): Look[] {
   const defs: { title: string; req: StyleRequest }[] = [
     { title: 'Tenue du jour', req: { context: 'quotidien', tone: 'default', mustInclude: [] } },
     { title: 'Look old money', req: { context: 'rendez-vous', tone: 'oldmoney', mustInclude: [] } },
@@ -329,7 +342,7 @@ export function homeSelections(garments: Garment[], w: Weather | null): Look[] {
   const used: string[] = []
   const looks: Look[] = []
   for (const d of defs) {
-    const req = { ...d.req, avoidIds: used.slice(-6) }
+    const req = { ...d.req, prefs, avoidIds: used.slice(-6) }
     const l = suggest(garments, w, req)[0]
     if (!l) continue
     used.push(...l.itemIds)
@@ -363,6 +376,7 @@ export function parseIntent(text: string, garments: Garment[]): ParsedIntent {
 
   if (/old money|vieille fortune/.test(t)) { tone = 'oldmoney'; label = 'Old Money' }
   else if (/sans etre trop habille|smart casual|chic decontract|elegant sans/.test(t)) { tone = 'smart'; label = 'Élégance décontractée' }
+  else if (/elegan|classe/.test(t) && !/decontract/.test(t)) { tone = 'smart'; label = 'Élégant' }
   else if (/decontract|casual|relax|cool|simple|confort/.test(t)) { tone = 'casual'; label = 'Plus décontracté' }
   else if (/formel|habille|ceremonie|mariage|costume|chic/.test(t)) { tone = 'formal'; label = 'Tenue habillée' }
 
@@ -391,3 +405,48 @@ export function parseIntent(text: string, garments: Garment[]): ParsedIntent {
 
 export const todayStr = () => ymd()
 export { shuffle }
+
+/* ---------- Conseils : couleurs et bilan du dressing ---------- */
+
+export function findGarment(q: string, garments: Garment[]): Garment | null {
+  const words = norm(q).split(/\s+/).filter((x) => x.length > 2)
+  const scored = garments
+    .filter((g) => g.status !== 'archived')
+    .map((g) => {
+      const hay = norm(`${g.name} ${CAT_BY_ID[g.category].label} ${g.brand} ${colorName(g.color)} ${g.material}`)
+      return { g, hits: words.filter((w) => hay.includes(w.replace(/s$/, ''))).length }
+    })
+    .filter((x) => x.hits > 1)
+    .sort((a, b) => b.hits - a.hits)
+  return scored[0]?.g ?? null
+}
+
+export function colorAdvice(text: string, garments: Garment[]): string | null {
+  if (!/couleur|assort|va avec|vont avec/.test(norm(text))) return null
+  const base = findGarment(text, garments)
+  if (!base) return null
+  const others = garments.filter((g) => g.id !== base.id && g.status === 'available' && slotOf(g.category) !== slotOf(base.category))
+  if (others.length === 0) return 'Ajoute d’autres pièces à ton dressing et je te dirai ce qui s’associe le mieux.'
+  const ranked = others.map((g) => ({ g, s: harmony(base.color, g.color) })).sort((a, b) => b.s - a.s)
+  const best = ranked.slice(0, 4).map((x) => `${x.g.name} (${colorName(x.g.color).toLowerCase()})`)
+  const worst = ranked.filter((x) => x.s < 0.6).slice(-2).map((x) => x.g.name)
+  return `Avec « ${base.name} » (${colorName(base.color).toLowerCase()}), les meilleures associations de ton dressing : ${best.join(', ')}.` + (worst.length ? ` À éviter : ${worst.join(', ')}.` : '')
+}
+
+export function wardrobeInsights(garments: Garment[]): string {
+  const g = garments.filter((x) => x.status !== 'archived')
+  if (g.length < 5) return 'Ton dressing est encore petit : ajoute au moins quelques hauts, bas et chaussures pour que je puisse t’aider.'
+  const out: string[] = []
+  const has = (c: string[]) => g.some((x) => c.includes(x.category))
+  const neutral = g.filter((x) => isNeutral(x.color) || colorFamily(x.color) === 'earth').length / g.length
+  out.push(neutral >= 0.6 ? 'Base de couleurs saine : tes neutres dominent, tout s’associe facilement.' : 'Peu de neutres (noir, blanc, beige, marine) : en ajouter faciliterait toutes tes associations.')
+  if (!has(['manteau'])) out.push('Il te manque un manteau pour les jours froids.')
+  if (!has(['veste', 'blouson'])) out.push('Une veste ou un blouson léger t’aiderait pour la mi-saison.')
+  if (!g.some((x) => slotOf(x.category) === 'shoes' && x.formality >= 4)) out.push('Aucune chaussure habillée : utile pour le travail et les soirées.')
+  const tops = g.filter((x) => slotOf(x.category) === 'top').length
+  const bottoms = g.filter((x) => slotOf(x.category) === 'bottom').length
+  if (tops > bottoms * 3 && bottoms > 0) out.push('Beaucoup de hauts pour peu de bas : un ou deux pantalons polyvalents équilibreraient.')
+  const never = g.filter((x) => x.wornDates.length === 0).length
+  if (never > 0) out.push(`${never} pièce${never > 1 ? 's' : ''} jamais portée${never > 1 ? 's' : ''} : dis-moi « habille-moi avec … » pour les remettre en jeu.`)
+  return out.join(' ')
+}

@@ -48,7 +48,7 @@ html, body, #root {
     @apply btn border border-champagne/40 text-champagne;
   }
   .field {
-    @apply w-full rounded-xl bg-noir border border-white/10 px-4 py-3 text-[14px] text-ivoire placeholder:text-creme/30 outline-none focus:border-champagne/60 transition;
+    @apply w-full rounded-xl bg-noir border border-white/10 px-4 py-3 text-[16px] text-ivoire placeholder:text-creme/30 outline-none focus:border-champagne/60 transition;
   }
   .chip {
     @apply rounded-full border border-white/10 px-3.5 py-1.5 text-[11px] uppercase tracking-[0.14em] text-creme/70 whitespace-nowrap transition;

@@ -4,7 +4,7 @@ import { idbStorage } from './db'
 import { slotOf } from './constants'
 import { uid, ymd } from './utils'
 import type {
-  AvatarConfig, CalendarEntry, Capsule, Context, Garment, Outfit, Settings, WishItem,
+  AvatarConfig, CalendarEntry, Capsule, Context, Fit, Garment, Outfit, Settings, WishItem,
 } from '../types'
 
 export const DEFAULT_AVATAR: AvatarConfig = {
@@ -20,6 +20,7 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   underwear: 'noir',
   photo: '',
   fit: {},
+  neck: 0.15,
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,6 +28,9 @@ export const DEFAULT_SETTINGS: Settings = {
   location: null,
   notifications: false,
   aiEnabled: false,
+  favStyles: [],
+  favColors: [],
+  sizes: { top: '', bottom: '', shoes: '' },
 }
 
 interface Data {
@@ -47,7 +51,7 @@ interface Actions {
   removeGarment: (id: string) => void
   setStatus: (id: string, status: Garment['status']) => void
 
-  saveOutfit: (name: string, itemIds: string[], context?: Context | '', favorite?: boolean) => string
+  saveOutfit: (name: string, itemIds: string[], context?: Context | '', favorite?: boolean, fit?: Record<string, Fit>) => string
   updateOutfit: (id: string, patch: Partial<Outfit>) => void
   toggleFavorite: (id: string) => void
   removeOutfit: (id: string) => void
@@ -153,9 +157,9 @@ export const useStore = create<Store>()(
           tryOn: status === 'available' ? s.tryOn : s.tryOn.filter((i) => i !== id),
         })),
 
-      saveOutfit: (name, itemIds, context = '', favorite = false) => {
+      saveOutfit: (name, itemIds, context = '', favorite = false, fit) => {
         const id = uid()
-        const outfit: Outfit = { id, name, itemIds, favorite, context, note: '', createdAt: Date.now() }
+        const outfit: Outfit = { id, name, itemIds, favorite, context, note: '', fit, createdAt: Date.now() }
         set((s) => ({ outfits: [outfit, ...s.outfits] }))
         return id
       },

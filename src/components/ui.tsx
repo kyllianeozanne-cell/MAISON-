@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useDragControls } from 'framer-motion'
 import { useEffect, useState, type ReactNode } from 'react'
 import { create } from 'zustand'
 import { cx } from '../lib/utils'
@@ -115,6 +115,7 @@ export function ToastHost() {
 export function Sheet({
   open, onClose, title, children, tall = false,
 }: { open: boolean; onClose: () => void; title?: string; children: ReactNode; tall?: boolean }) {
+  const controls = useDragControls()
   useEffect(() => {
     if (!open) return
     const prev = document.body.style.overflow
@@ -139,11 +140,13 @@ export function Sheet({
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 32, stiffness: 320 }}
             drag="y"
+            dragListener={false}
+            dragControls={controls}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.5 }}
             onDragEnd={(_, info) => { if (info.offset.y > 120 || info.velocity.y > 600) onClose() }}
           >
-            <div className="flex shrink-0 flex-col items-center pt-2.5">
+            <div className="flex shrink-0 flex-col items-center pt-2.5" style={{ touchAction: 'none' }} onPointerDown={(e) => controls.start(e)}>
               <div className="h-[3px] w-9 rounded-full bg-champagne/30" />
               {title && (
                 <div className="flex w-full items-center justify-between px-6 pb-2 pt-4">

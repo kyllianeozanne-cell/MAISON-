@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { LookCard } from '../components/Look'
 import { Header, Icon, Spinner, toast } from '../components/ui'
 import { aiConfigured, askStylist } from '../lib/ai'
-import { missingForOutfit, parseIntent, suggest, weatherCompat } from '../lib/stylist'
+import { colorAdvice, missingForOutfit, parseIntent, suggest, weatherCompat, wardrobeInsights } from '../lib/stylist'
 import { useStore } from '../lib/store'
 import { useWeather } from '../lib/weatherStore'
 import { cx, uid } from '../lib/utils'
@@ -17,6 +17,8 @@ const PROMPTS = [
   'Propose quelque chose de plus décontracté',
   'Je veux être élégant sans être trop habillé',
   'Que porter avec mon pantalon beige ?',
+  'Quelles couleurs vont avec mon pull marine ?',
+  'Analyse mon dressing',
 ]
 
 export function Stylist({ tryLook }: { tryLook: (l: { itemIds: string[] }) => void }) {
@@ -38,6 +40,12 @@ export function Stylist({ tryLook }: { tryLook: (l: { itemIds: string[] }) => vo
     if (!t || busy) return
     setInput('')
     setMsgs((m) => [...m, { id: uid(), role: 'user', text: t }])
+    const lower = t.toLowerCase()
+    const advice = colorAdvice(t, garments)
+    if (advice || /analyse|bilan|am[ée]liorer mon style/.test(lower)) {
+      setMsgs((m) => [...m, { id: uid(), role: 'assistant', text: advice ?? wardrobeInsights(garments) }])
+      return
+    }
     const miss = missingForOutfit(garments)
     if (miss.length) {
       setMsgs((m) => [...m, { id: uid(), role: 'assistant', text: `Je ne peux composer une tenue qu’avec tes pièces, et il me manque ${miss.join(' et ')}. Ajoute-les à ton dressing et je m’en occupe.` }])
@@ -59,7 +67,7 @@ export function Stylist({ tryLook }: { tryLook: (l: { itemIds: string[] }) => vo
         }
       }
       const intent = parseIntent(t, garments)
-      const look = suggest(garments, weather, { context: intent.context, tone: intent.tone, mustInclude: intent.mustInclude, avoidIds: avoid, count: 1 })[0]
+      const look = suggest(garments, weather, { context: intent.context, tone: intent.tone, mustInclude: intent.mustInclude, avoidIds: avoid, count: 1, prefs: { styles: settings.favStyles ?? [], colors: settings.favColors ?? [] } })[0]
       setMsgs((m) => [...m, look
         ? { id: uid(), role: 'assistant', text: 'Voici ma sélection, composée uniquement de tes pièces.', look: { ...look, title: intent.label } }
         : { id: uid(), role: 'assistant', text: 'Je n’ai pas trouvé de combinaison disponible. Une pièce est peut-être au lavage ?' }])

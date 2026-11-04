@@ -80,6 +80,7 @@ export function GarmentDetail({ garment, onClose, onTry }: { garment: Garment | 
             <button className="btn-ghost" onClick={() => { setStatus(g.id, g.status === 'archived' ? 'available' : 'archived'); toast(g.status === 'archived' ? 'Pièce restaurée' : 'Pièce archivée'); close() }}>
               <Icon name="archive" size={16} /> {g.status === 'archived' ? 'Restaurer' : 'Archiver'}
             </button>
+            <button className="btn-ghost col-span-2" onClick={() => updateGarment(g.id, { favorite: !g.favorite })}><Icon name="heart" size={16} className={g.favorite ? 'fill-champagne' : ''} /> {g.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}</button>
             {confirmDelete ? (
               <button className="btn col-span-2 border border-red-300/40 text-red-200" onClick={() => { removeGarment(g.id); toast('Pièce supprimée'); close() }}>
                 Confirmer la suppression

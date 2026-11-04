@@ -70,7 +70,8 @@ function removeBackground(img: ImageData) {
     return v[Math.floor(v.length / 2)]
   }
   const bg: [number, number, number] = [med(0), med(1), med(2)]
-  const tol = 38 // tolérance couleur
+  const dev = samples.reduce((a, s) => a + Math.abs(s[0] - bg[0]) + Math.abs(s[1] - bg[1]) + Math.abs(s[2] - bg[2]), 0) / (samples.length * 3)
+  const tol = Math.max(30, Math.min(70, 26 + dev * 2.2)) // tolérance adaptée à l'uniformité du fond
   const dist = (i: number) =>
     Math.sqrt((data[i] - bg[0]) ** 2 + (data[i + 1] - bg[1]) ** 2 + (data[i + 2] - bg[2]) ** 2)
 

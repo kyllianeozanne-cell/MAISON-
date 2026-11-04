@@ -5,15 +5,24 @@ import { LocationPicker } from '../components/LocationPicker'
 import { CompatBadge, LookRow, OutfitCollage, orderItems } from '../components/Look'
 import { Icon, Section, Segmented, Spinner } from '../components/ui'
 import { slotOf } from '../lib/constants'
-import { homeSelections, suggest } from '../lib/stylist'
+import { homeSelections, suggest, type Tone } from '../lib/stylist'
 import { useStore } from '../lib/store'
 import { isWet } from '../lib/weather'
 import { useWeather } from '../lib/weatherStore'
 import { greeting, longDate, ymd } from '../lib/utils'
-import type { Garment, Look } from '../types'
+import type { Context, Garment, Look } from '../types'
 import type { Tab } from '../components/NavBar'
 
-type RTab = 'today' | 'week' | 'events'
+type RTab = 'today' | 'work' | 'daily' | 'out' | 'elegant' | 'weekend' | 'events' | 'week'
+type Def = { titles: string[]; reqs: { context: Context; tone: Tone }[] }
+const TAB_DEFS: Record<'work' | 'daily' | 'out' | 'elegant' | 'weekend' | 'events', Def> = {
+  work: { titles: ['Look bureau', 'Smart et sobre', 'Rendez-vous client'], reqs: [{ context: 'travail', tone: 'smart' }, { context: 'travail', tone: 'default' }, { context: 'travail', tone: 'formal' }] },
+  daily: { titles: ['Au quotidien', 'Simple et soigné', 'Confort chic'], reqs: [{ context: 'quotidien', tone: 'default' }, { context: 'quotidien', tone: 'casual' }, { context: 'quotidien', tone: 'smart' }] },
+  out: { titles: ['Sortie du soir', 'Dîner', 'Cocktail'], reqs: [{ context: 'soiree', tone: 'default' }, { context: 'rendez-vous', tone: 'smart' }, { context: 'soiree', tone: 'formal' }] },
+  elegant: { titles: ['Élégance classique', 'Old money', 'Allure habillée'], reqs: [{ context: 'rendez-vous', tone: 'formal' }, { context: 'rendez-vous', tone: 'oldmoney' }, { context: 'travail', tone: 'formal' }] },
+  weekend: { titles: ['Week-end détendu', 'Escapade', 'Brunch'], reqs: [{ context: 'weekend', tone: 'casual' }, { context: 'weekend', tone: 'smart' }, { context: 'weekend', tone: 'default' }] },
+  events: { titles: ['Look bureau', 'Rendez-vous', 'Soirée'], reqs: [{ context: 'travail', tone: 'smart' }, { context: 'rendez-vous', tone: 'oldmoney' }, { context: 'soiree', tone: 'formal' }] },
+}
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function Hero({ look, garments, onTry, hasWeather }: { look: Look; garments: Garment[]; onTry: (l: Look) => void; hasWeather: boolean }) {
@@ -45,22 +54,25 @@ export function Home({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: { ite
   const [loc, setLoc] = useState(false)
   const [seed, setSeed] = useState(0)
   const [rtab, setRtab] = useState<RTab>('today')
+  const prefs = useMemo(() => ({ styles: settings.favStyles ?? [], colors: settings.favColors ?? [] }), [settings.favStyles, settings.favColors])
 
   useEffect(() => { load() }, [load, settings.location])
 
   const active = garments.filter((g) => g.status !== 'archived')
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const looks: Look[] = useMemo(() => homeSelections(garments, weather), [garments, weather, seed])
+  const looks: Look[] = useMemo(() => homeSelections(garments, weather, prefs), [garments, weather, seed, prefs])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const events: Look[] = useMemo(() => {
+  const tabLooks: Look[] = useMemo(() => {
+    if (rtab === 'today' || rtab === 'week') return []
+    const def = TAB_DEFS[rtab]
     const used: string[] = []
-    return ([['travail', 'smart', 'Look bureau'], ['rendez-vous', 'oldmoney', 'Rendez-vous'], ['soiree', 'formal', 'Soirée']] as const).flatMap(([context, tone, title]) => {
-      const l = suggest(garments, weather, { context, tone, mustInclude: [], avoidIds: used.slice(-6) })[0]
-      if (!l) return []
-      used.push(...l.itemIds)
-      return [{ ...l, title }]
+    const out: Look[] = []
+    def.reqs.forEach((r, i) => {
+      const l = suggest(garments, weather, { ...r, mustInclude: [], avoidIds: used.slice(-8), prefs })[0]
+      if (l) { used.push(...l.itemIds); out.push({ ...l, title: def.titles[i] }) }
     })
-  }, [garments, weather, seed])
+    return out
+  }, [rtab, garments, weather, seed, prefs])
   const week = useMemo(() => {
     const out: { k: string; d: Date; planned: boolean; ids: string[] }[] = []
     for (let i = 0; i < 7; i++) {
@@ -172,10 +184,10 @@ export function Home({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: { ite
 
       <Section title="Recommandations">
         <div className="px-6">
-          <div className="mb-5"><Segmented<RTab> value={rtab} onChange={setRtab} options={[{ id: 'today', label: 'Aujourd’hui' }, { id: 'week', label: 'Semaine' }, { id: 'events', label: 'Événements' }]} /></div>
+          <div className="mb-5"><Segmented<RTab> value={rtab} onChange={setRtab} options={[{ id: 'today', label: 'Aujourd’hui' }, { id: 'work', label: 'Travail' }, { id: 'daily', label: 'Quotidien' }, { id: 'out', label: 'Sortie' }, { id: 'elegant', label: 'Élégant' }, { id: 'weekend', label: 'Week-end' }, { id: 'events', label: 'Événements' }, { id: 'week', label: 'Semaine' }]} /></div>
           <motion.div key={rtab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3">
             {rtab === 'today' && (looks.length > 1 ? looks.slice(1).map((l) => <LookRow key={l.id} look={l} garments={garments} onTry={tryLook} temp={weather?.temp} />) : <p className="py-4 text-center text-[12.5px] text-creme/45">Pas encore assez de pièces pour proposer plusieurs looks.</p>)}
-            {rtab === 'events' && (events.length ? events.map((l) => <LookRow key={l.id} look={l} garments={garments} onTry={tryLook} temp={weather?.temp} />) : <p className="py-4 text-center text-[12.5px] text-creme/45">Ajoute des pièces pour obtenir des looks par occasion.</p>)}
+            {rtab !== 'today' && rtab !== 'week' && (tabLooks.length ? tabLooks.map((l) => <LookRow key={l.id} look={l} garments={garments} onTry={tryLook} temp={weather?.temp} />) : <p className="py-4 text-center text-[12.5px] text-creme/45">Ajoute des pièces pour obtenir des looks par occasion.</p>)}
             {rtab === 'week' && (week.length ? week.map((w) => (
               <button key={w.k} onClick={() => tryLook({ itemIds: w.ids })} className="card flex items-center gap-4 p-3 text-left">
                 <div className="flex w-28 shrink-0 gap-1">{byId(w.ids).slice(0, 3).map((g) => <GarmentThumb key={g.id} garment={g} className="aspect-[3/4] flex-1 rounded-md" />)}</div>
