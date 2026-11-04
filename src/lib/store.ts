@@ -18,6 +18,8 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   hairColor: '#3a2a1e',
   beard: 'none',
   underwear: 'noir',
+  photo: '',
+  fit: {},
 }
 
 export const DEFAULT_SETTINGS: Settings = {

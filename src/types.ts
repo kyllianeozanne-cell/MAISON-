@@ -81,6 +81,8 @@ export interface AvatarConfig {
   hairColor: string
   beard: 'none' | 'stubble' | 'short' | 'full'
   underwear: 'beige' | 'noir'
+  photo: string // photo en pied (data URL), stockée sur l'appareil
+  fit: Partial<Record<Slot, { x: number; y: number; s: number }>>
 }
 
 export interface GeoPoint {

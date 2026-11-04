@@ -138,3 +138,49 @@ export async function dominantColor(dataUrl: string): Promise<string> {
   const hx = (v: number) => Math.round(v / best!.n).toString(16).padStart(2, '0')
   return `#${hx(best.r)}${hx(best.g)}${hx(best.b)}`
 }
+
+/** Photo en pied de l'utilisateur : réduite (1400 px max) et recompressée. Reste sur l'appareil. */
+export async function processBodyPhoto(file: File): Promise<string> {
+  const src = await fileToDataUrl(file)
+  const img = await loadImage(src)
+  const scale = Math.min(1, 1400 / Math.max(img.width, img.height))
+  const c = document.createElement('canvas')
+  c.width = Math.round(img.width * scale)
+  c.height = Math.round(img.height * scale)
+  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+  return c.toDataURL('image/jpeg', 0.88)
+}
+
+/** Détoure une photo de vêtement (fond uni) et recadre sur la pièce. PNG transparent. */
+export async function cutoutDataUrl(src: string): Promise<string> {
+  const img = await loadImage(src)
+  const w = img.width
+  const h = img.height
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const ctx = c.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(img, 0, 0)
+  const data = ctx.getImageData(0, 0, w, h)
+  removeBackground(data)
+  let x0 = w, y0 = h, x1 = 0, y1 = 0
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data.data[(y * w + x) * 4 + 3] > 40) {
+        if (x < x0) x0 = x
+        if (x > x1) x1 = x
+        if (y < y0) y0 = y
+        if (y > y1) y1 = y
+      }
+    }
+  }
+  if (x1 <= x0 || y1 <= y0) return src
+  ctx.putImageData(data, 0, 0)
+  const bw = x1 - x0 + 1
+  const bh = y1 - y0 + 1
+  const o = document.createElement('canvas')
+  o.width = bw
+  o.height = bh
+  o.getContext('2d')!.drawImage(c, x0, y0, bw, bh, 0, 0, bw, bh)
+  return o.toDataURL('image/png')
+}

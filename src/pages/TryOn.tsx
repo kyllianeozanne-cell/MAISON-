@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useMemo, useRef, useState } from 'react'
 import { AvatarEditor } from '../components/AvatarEditor'
 import { AvatarView } from '../components/Avatar3D'
+import { PhotoAvatar, fitOf } from '../components/PhotoAvatar'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { OutfitCollage, orderItems } from '../components/Look'
 import { Empty, Header, Icon, Sheet, toast } from '../components/ui'
@@ -16,10 +17,11 @@ const SLOTS: Slot[] = ['top', 'bottom', 'outer', 'shoes', 'accessory', 'suit']
 
 export function TryOn({ goStylist }: { goStylist: () => void }) {
   const { garments, avatar, tryOn, outfits } = useStore()
-  const { toggleTryOn, setTryOn, clearTryOn, saveOutfit, updateOutfit, toggleFavorite, removeOutfit, logOutfit } = useStore()
+  const { setAvatar, toggleTryOn, setTryOn, clearTryOn, saveOutfit, updateOutfit, toggleFavorite, removeOutfit, logOutfit } = useStore()
   const weather = useWeather((s) => s.weather)
   const [slot, setSlot] = useState<Slot>('top')
   const [rotate, setRotate] = useState(false)
+  const [adjust, setAdjust] = useState<Slot | null>(null)
   const [editor, setEditor] = useState(false)
   const [saveOpen, setSaveOpen] = useState(false)
   const [name, setName] = useState('')
@@ -101,7 +103,7 @@ export function TryOn({ goStylist }: { goStylist: () => void }) {
 
       <div ref={scroller} className="relative mx-6 overflow-hidden rounded-[20px] border border-white/[0.05] bg-gradient-to-b from-brun to-anthracite shadow-depth">
         <div className="h-[50vh] min-h-[360px] max-h-[520px]">
-          <AvatarView config={avatar} items={worn} autoRotate={rotate} />
+          {avatar.photo ? <PhotoAvatar photo={avatar.photo} items={worn} fit={avatar.fit} selected={adjust} onFit={(slot, f) => setAvatar({ fit: { ...avatar.fit, [slot]: f } })} /> : <AvatarView config={avatar} items={worn} autoRotate={rotate} />}
         </div>
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           {[
@@ -114,9 +116,27 @@ export function TryOn({ goStylist }: { goStylist: () => void }) {
           ))}
         </div>
         <p className="absolute inset-x-4 bottom-2.5 text-center text-[9.5px] uppercase tracking-[0.16em] text-creme/35">
-          Aperçu indicatif · couleurs et volumes, pas la coupe réelle
+          {avatar.photo ? 'Montage sur ta photo · pas un ajustement réel' : 'Aperçu indicatif · couleurs et volumes, pas la coupe réelle'}
         </p>
       </div>
+
+      {avatar.photo && worn.some((g) => slotOf(g.category) !== 'accessory') && (
+        <div className="mx-6 mt-3">
+          <p className="mb-2 text-[11px] text-creme/45">Ajuster : choisis une pièce, puis fais-la glisser sur la photo.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {worn.filter((g) => slotOf(g.category) !== 'accessory').map((g) => {
+              const s = slotOf(g.category)
+              return <button key={g.id} onClick={() => setAdjust(adjust === s ? null : s)} className={cx('chip', adjust === s && 'chip-on')}>{SLOT_LABEL[s]}</button>
+            })}
+          </div>
+          {adjust && (
+            <div className="mt-3 flex items-center gap-4">
+              <input type="range" min={0.12} max={0.9} step={0.01} value={fitOf(avatar.fit, adjust).s} onChange={(e) => setAvatar({ fit: { ...avatar.fit, [adjust]: { ...fitOf(avatar.fit, adjust), s: Number(e.target.value) } } })} />
+              <button className="chip" onClick={() => { const n = { ...avatar.fit }; delete n[adjust]; setAvatar({ fit: n }) }}>Réinit.</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {editingId && <p className="mx-6 mt-3 text-center text-[11px] uppercase tracking-[0.18em] text-champagne">Modification d’une tenue enregistrée</p>}
 
