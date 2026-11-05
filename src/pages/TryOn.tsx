@@ -2,9 +2,11 @@ import { motion } from 'framer-motion'
 import { useMemo, useRef, useState } from 'react'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { orderItems } from '../components/Look'
+import { ColorWheel } from '../components/ColorWheel'
 import { LookBoard } from '../components/LookBoard'
 import { Empty, Header, Icon, Sheet, toast } from '../components/ui'
 import { CONTEXTS, SLOT_LABEL, slotOf } from '../lib/constants'
+import { lookImage } from '../lib/shareImage'
 import { prefsOf, suggest } from '../lib/stylist'
 import { useStore } from '../lib/store'
 import { useWeather } from '../lib/weatherStore'
@@ -41,8 +43,12 @@ export function TryOn({ goStylist }: { goStylist: () => void }) {
   }
   const share = async () => {
     if (worn.length === 0) return toast('Compose d’abord un look.')
-    const text = `MAISON — ${name || 'Mon look'}\n` + orderItems(worn).map((g) => `• ${g.name}${g.brand ? ` (${g.brand})` : ''}`).join('\n')
-    try { if (navigator.share) await navigator.share({ title: 'MAISON', text }); else { await navigator.clipboard.writeText(text); toast('Composition copiée') } } catch { /* annulé */ }
+    try {
+      const blob = await lookImage(orderItems(worn), name || 'Mon look')
+      const file = new File([blob], 'maison-look.png', { type: 'image/png' })
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'MAISON' })
+      else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'maison-look.png'; a.click(); URL.revokeObjectURL(a.href); toast('Image enregistrée') }
+    } catch { /* annulé */ }
   }
   const openSave = () => {
     if (worn.length === 0) return toast('Ajoute au moins une pièce.')
@@ -85,6 +91,7 @@ export function TryOn({ goStylist }: { goStylist: () => void }) {
         )}
         {settings.photo && <img src={settings.photo} alt="Ma photo" className="absolute left-3 top-3 h-16 w-12 rounded-lg border border-white/20 object-cover shadow-depth" />}
       </div>
+      {worn.length > 1 && <div className="mx-6 mt-4"><ColorWheel colors={worn.map((g) => g.color)} /></div>}
       {editingId && <p className="mx-6 mt-3 text-center text-[11px] uppercase tracking-[0.18em] text-champagne">Modification d’un look enregistré</p>}
 
       {worn.length > 0 && (

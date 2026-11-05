@@ -91,6 +91,7 @@ export interface Settings {
   avoid?: CategoryId[]
   layers?: boolean
   favBrands?: string[]
+  lastBackup?: string
   budget?: number | null
 }
 

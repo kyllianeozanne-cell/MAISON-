@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { orderItems } from '../components/Look'
 import { LookBoard } from '../components/LookBoard'
+import { ColorWheel } from '../components/ColorWheel'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { ColorDot, Icon, Spinner, toast } from '../components/ui'
 import { aiMode, askStylist } from '../lib/ai'
@@ -110,6 +111,7 @@ export function Stylist({ tryLook }: { tryLook: (l: { itemIds: string[] }) => vo
           <ul className="mb-4 space-y-1.5">
             {items.map((g) => <li key={g.id} className="flex items-center gap-2.5 text-[13px] text-ivoire"><ColorDot color={g.color} size={10} />{g.name}</li>)}
           </ul>
+          <div className="mb-4 border-t border-white/[0.06] pt-4"><ColorWheel colors={items.map((g) => g.color)} /></div>
           {bullets.length > 0 && <ul className="mb-4 space-y-1.5 border-t border-white/[0.06] pt-4">{bullets.map((b) => <li key={b} className="text-[12.5px] leading-relaxed text-creme/60">{b}</li>)}</ul>}
           {look.match != null && <p className="mb-4 text-[11px] uppercase tracking-[0.14em] text-creme/45">Compatibilité {look.match} %{weather ? ` · météo ${look.score} %` : ''} · harmonie {look.harmony ?? '—'} %</p>}
           <div className="grid grid-cols-2 gap-2.5">

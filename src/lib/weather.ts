@@ -168,3 +168,26 @@ export async function fetchTripWeather(
     return null
   }
 }
+
+/** Prévision jour par jour (7 jours) sous forme de Weather simplifié, pour planifier la semaine. */
+export async function fetchWeek(point: GeoPoint): Promise<Record<string, Weather>> {
+  const url =
+    'https://api.open-meteo.com/v1/forecast' +
+    `?latitude=${point.lat}&longitude=${point.lon}` +
+    '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max' +
+    '&timezone=auto&forecast_days=7'
+  const out: Record<string, Weather> = {}
+  try {
+    const r = await fetch(url)
+    if (!r.ok) return out
+    const j = await r.json()
+    const t: string[] = j.daily.time
+    t.forEach((d, i) => {
+      const max = Math.round(j.daily.temperature_2m_max[i]), min = Math.round(j.daily.temperature_2m_min[i])
+      const rain = Math.round(j.daily.precipitation_probability_max[i] ?? 0)
+      const mid = Math.round((max + min) / 2)
+      out[d] = { temp: mid, feels: mid, code: rain >= 50 ? 61 : 1, label: '', rainProb: rain, wind: Math.round(j.daily.wind_speed_10m_max[i] ?? 0), isDay: true, hourly: [], min, max, fetchedAt: Date.now() }
+    })
+  } catch { /* hors ligne */ }
+  return out
+}

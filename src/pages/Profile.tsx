@@ -12,6 +12,8 @@ import { supabase } from '../lib/supabase'
 import { usable, warmthOf, targetWarmth } from '../lib/stylist'
 import { useStore } from '../lib/store'
 import { fetchTripWeather } from '../lib/weather'
+import { bilan, challenge, costPerWear, countOutfits } from '../lib/insights'
+import { planWeek } from '../lib/planner'
 import { cx, eur, parseYmd, ymd } from '../lib/utils'
 import type { CategoryId, Context, Garment, GeoPoint } from '../types'
 
@@ -90,6 +92,9 @@ function Stats() {
   const perWear = worn.length ? worn.reduce((a, x) => a + (x.price ?? 0) / x.wornDates.length, 0) / worn.length : null
   const most = [...g].filter((x) => x.wornDates.length).sort((a, b) => b.wornDates.length - a.wornDates.length).slice(0, 5)
   const never = g.filter((x) => x.wornDates.length === 0)
+  const bl = bilan(all)
+  const ch = challenge(all)
+  const worst = [...priced].sort((a, b) => (costPerWear(b) ?? 0) - (costPerWear(a) ?? 0)).slice(0, 4)
   if (g.length === 0) return <Empty icon="chart" title="Pas encore de données" text="Tes statistiques apparaîtront dès que ton dressing contiendra des pièces." />
   return (
     <div>
@@ -98,6 +103,20 @@ function Stats() {
           <div key={k} className="card p-4 text-center"><div className="title-serif text-[26px]">{v}</div><div className="caps mt-1 !text-[9px]">{k}</div></div>
         ))}
       </div>
+      <Block title="Bilan de ton dressing">
+        <div className="mb-4 grid grid-cols-3 gap-3 text-center">
+          {[[String(bl.outfits), 'tenues possibles'], [String(bl.dormant), 'pièces dormantes'], [`${bl.neutralPct} %`, 'de neutres']].map(([v, k]) => <div key={k}><div className="title-serif text-[26px]">{v}</div><div className="mt-1 text-[10.5px] leading-tight text-creme/50">{k}</div></div>)}
+        </div>
+        <div className="flex flex-wrap gap-2">{bl.basics.map((b) => <span key={b.label} className={cx('chip', b.ok ? 'chip-on' : 'opacity-50')}>{b.ok ? '✓ ' : ''}{b.label}</span>)}</div>
+        <p className="mt-3 text-[11px] leading-relaxed text-creme/40">Tenues = hauts × bas × chaussures disponibles. « Dormantes » : pièces non portées depuis 60 jours.</p>
+      </Block>
+      <Block title="Défi 30 jours">
+        <div className="mb-2 flex justify-between text-[12.5px] text-ivoire"><span>{ch.worn} / {ch.total} pièces portées</span><span className="text-creme/50">{ch.total ? Math.round((ch.worn / ch.total) * 100) : 0} %</span></div>
+        <div className="mb-4 h-[3px] rounded-full bg-white/10"><div className="h-full rounded-full bg-champagne" style={{ width: `${ch.total ? (ch.worn / ch.total) * 100 : 0}%` }} /></div>
+        {ch.left.length ? <><div className="caps mb-2 !text-creme/50">À porter pour réussir</div>{ch.left.slice(0, 5).map((x) => <GarmentRow key={x.id} g={x} sub="pas portée" />)}</> : <p className="text-[12px] text-creme/45">Bravo : tout ton dressing a été porté ce mois-ci.</p>}
+        <p className="mt-3 text-[11px] text-creme/40">Enregistre tes tenues dans le calendrier pour faire avancer le défi.</p>
+      </Block>
+      {worst.length > 0 && <Block title="Coût par port (à rentabiliser)">{worst.map((x) => <GarmentRow key={x.id} g={x} sub={`${eur(Math.round(costPerWear(x) ?? 0))} / port`} />)}</Block>}
       <Block title="Répartition par catégorie"><Donut data={top((x) => GROUP_LABEL[slotOf(x.category)], 6)} /></Block>
       <Block title="Valeur du dressing"><div className="flex justify-between text-[13px] text-ivoire"><span>{priced.length ? eur(total) : 'Prix non renseignés'}</span><span className="text-creme/50">{perWear != null ? `${eur(Math.round(perWear))} par port` : ''}</span></div></Block>
       <Block title="Couleurs dominantes"><Bars data={top((x) => colorName(x.color), 6, (x) => x.color)} /></Block>
@@ -113,6 +132,7 @@ function CalendarView() {
   const { calendar, outfits, garments, tryOn, logOutfit, removeEntry, markPlannedWorn } = useStore()
   const [cur, setCur] = useState(() => { const d = new Date(); d.setDate(1); return d })
   const [sel, setSel] = useState<string | null>(null)
+  const [planning, setPlanning] = useState(false)
   const byId = (ids: string[]) => ids.map((i) => garments.find((x) => x.id === i)).filter((x): x is Garment => !!x)
   const first = (cur.getDay() + 6) % 7
   const days = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate()
@@ -142,6 +162,7 @@ function CalendarView() {
           )
         })}
       </div>
+      <button className="btn-gold mt-5 w-full" disabled={planning} onClick={async () => { setPlanning(true); const n = await planWeek(); setPlanning(false); toast(n ? `${n} jour${n > 1 ? 's' : ''} planifié${n > 1 ? 's' : ''}` : 'Rien à planifier (jours déjà remplis ou dressing trop petit)') }}><Icon name="calendar" size={15} /> Planifier ma semaine</button>
       <p className="mt-3 text-[10.5px] text-creme/35">Plein = portée · pointillé = planifiée</p>
       {forgotten.length > 0 && <div className="mt-7"><Block title="Oubliées depuis 45 jours">{forgotten.map((g) => <GarmentRow key={g.id} g={g} sub={g.wornDates.length ? 'ancien port' : 'jamais'} />)}</Block></div>}
 
@@ -217,7 +238,7 @@ function Trip() {
       </div>
       <button className="btn-gold mb-6 w-full" onClick={build} disabled={busy}><Icon name="suitcase" size={16} /> Préparer la valise</button>
       {list && (
-        <Block title={`${list.length} pièces — ${info}`}>
+        <Block title={`${list.length} pièces · ${countOutfits(list)} tenues — ${info}`}>
           {list.length === 0 ? <p className="text-[12px] text-creme/45">Ton dressing ne contient pas encore assez de pièces.</p> : list.map((g) => <GarmentRow key={g.id} g={g} sub={CAT_BY_ID[g.category].label} />)}
         </Block>
       )}
@@ -307,6 +328,14 @@ function Settings() {
   const [confirm, setConfirm] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
+  const backup = async () => {
+    const f = new File([exportData()], `maison-${ymd()}.json`, { type: 'application/json' })
+    try {
+      if (navigator.canShare?.({ files: [f] })) await navigator.share({ files: [f], title: 'Sauvegarde MAISON' })
+      else { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); URL.revokeObjectURL(a.href) }
+      setSettings({ lastBackup: ymd() }); toast('Sauvegarde créée')
+    } catch { /* annulé */ }
+  }
   const notif = async () => {
     if (settings.notifications) return setSettings({ notifications: false })
     if (!('Notification' in window)) return toast('Notifications non prises en charge ici.')
@@ -344,6 +373,10 @@ function Settings() {
         <p className="mt-3 text-[11px] leading-relaxed text-creme/40">
           Sans IA, le styliste est un moteur de règles (couleurs, météo, formalité) : utile, mais ce n’est pas de l’IA. Avec ta propre clé Anthropic, le nom, la catégorie, la couleur et la matière de tes pièces sont envoyés à Claude, jamais les photos. La clé reste sur cet appareil et chaque appel est facturé sur ton compte Anthropic.{serverConfigured && !settings.aiKey ? ' Une fonction serveur est détectée et sera utilisée.' : ''}
         </p>
+      </Block>
+      <Block title="Sauvegarde">
+        <p className="mb-4 text-[11.5px] leading-relaxed text-creme/45">Tout est stocké sur cet appareil. Enregistre une copie dans Fichiers (iCloud) pour ne rien perdre si tu changes de téléphone.{settings.lastBackup ? ` Dernière sauvegarde : ${settings.lastBackup}.` : ''}</p>
+        <button className="btn-gold w-full" onClick={backup}><Icon name="download" size={15} /> Sauvegarder maintenant</button>
       </Block>
       <Block title="Données">
         <p className="mb-4 text-[11.5px] text-creme/45">{supabase ? 'Supabase détecté (synchronisation à brancher, voir README).' : 'Tout est stocké sur cet appareil.'}</p>

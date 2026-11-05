@@ -8,6 +8,7 @@ import { homeSelections, prefsOf, suggest, type Tone } from '../lib/stylist'
 import { useStore } from '../lib/store'
 import { isWet } from '../lib/weather'
 import { useWeather } from '../lib/weatherStore'
+import { dormant, daysAgo } from '../lib/insights'
 import { greeting, longDate, ymd } from '../lib/utils'
 import type { Context, Garment, Look } from '../types'
 import type { Tab } from '../components/NavBar'
@@ -76,6 +77,14 @@ export function Home({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: { ite
     return out
   }, [calendar])
   const recent = outfits.slice(0, 6)
+  const reminders = useMemo(() => {
+    const r: string[] = []
+    if (weather && isWet(weather) && garments.some((g) => g.status === 'available' && (g.category === 'manteau' || g.category === 'blouson'))) r.push(`Pluie probable aujourd’hui (${weather.rainProb} %) : pense à ton manteau ou à ton blouson.`)
+    const d = dormant(garments, 60).filter((g) => g.wornDates.length > 0)[0]
+    if (d) r.push(`« ${d.name} » n’a pas été portée depuis plus de 2 mois : et si c’était aujourd’hui ?`)
+    if (active.length >= 5 && (!settings.lastBackup || settings.lastBackup < daysAgo(30))) r.push('Pense à sauvegarder ton dressing (Profil → Réglages → Sauvegarde).')
+    return r.slice(0, 2)
+  }, [weather, garments, settings.lastBackup, active.length])
   const byId = (ids: string[]) => ids.map((id) => garments.find((g) => g.id === id)).filter((g): g is Garment => !!g)
   const today = looks[0]
   const wIcon = weather ? (isWet(weather) ? 'rain' : weather.code <= 1 ? 'sun' : 'cloud') : 'sun'
@@ -150,6 +159,12 @@ export function Home({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: { ite
           </div>
         )}
       </div>
+
+      {reminders.length > 0 && (
+        <div className="mx-6 mt-6 space-y-2">
+          {reminders.map((r) => <div key={r} className="flex gap-3 rounded-xl border border-champagne/20 bg-champagne/[0.04] px-4 py-3 text-[12.5px] leading-relaxed text-creme/75"><Icon name="sparkle" size={15} className="mt-0.5 shrink-0 text-champagne" />{r}</div>)}
+        </div>
+      )}
 
       <Section title="Mon dressing" action={<button onClick={() => go('wardrobe')} className="caps">Voir tout</button>}>
         <div className="px-6">
