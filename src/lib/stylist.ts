@@ -2,7 +2,7 @@ import { CAT_BY_ID, slotOf, season as currentSeason } from './constants'
 import { colorFamily, colorName, harmony, isNeutral, paletteHarmony } from './colors'
 import { isWet } from './weather'
 import { clamp, daysBetween, parseYmd, shuffle, uid, ymd } from './utils'
-import type { Context, Garment, Look, Season, Slot, Weather } from '../types'
+import type { CategoryId, Context, Garment, Look, Season, Settings, Slot, Weather } from '../types'
 
 export type Tone = 'default' | 'casual' | 'smart' | 'formal' | 'oldmoney'
 
@@ -10,7 +10,7 @@ export interface StyleRequest {
   context: Context
   tone: Tone
   mustInclude: string[] // ids de pièces imposées
-  prefs?: { styles: string[]; colors: string[] } // préférences de l'utilisateur
+  prefs?: { styles: string[]; colors: string[]; avoid?: string[]; layers?: boolean } // préférences de l'utilisateur
   avoidIds?: string[] // ids à éviter (ex : « une autre combinaison »)
   count?: number
   date?: Date
@@ -186,7 +186,8 @@ function scoreCandidate(items: Garment[], w: Weather | null, req: StyleRequest, 
 }
 
 export function buildCandidates(garments: Garment[], w: Weather | null, req: StyleRequest, tries = 500): Candidate[] {
-  const pool = usable(garments)
+  const avoidCats = req.prefs?.avoid ?? []
+  const pool = usable(garments).filter((g) => !avoidCats.includes(g.category) || req.mustInclude.includes(g.id))
   const slots = bySlot(pool)
   const today = req.date ?? new Date()
   const must = pool.filter((g) => req.mustInclude.includes(g.id))
@@ -217,7 +218,7 @@ export function buildCandidates(garments: Garment[], w: Weather | null, req: Sty
       const shoes = pickFrom('shoes')
       let outer: Garment | undefined
       if (mustBySlot.outer.length) outer = mustBySlot.outer[0]
-      else if (allowOuter && slots.outer.length && (wantOuter || Math.random() < 0.35)) outer = pickFrom('outer')
+      else if (allowOuter && slots.outer.length && (wantOuter || Math.random() < (req.prefs?.layers ? 0.6 : 0.35))) outer = pickFrom('outer')
       items = [top, bottom, outer, shoes]
     }
     // accessoire facultatif (une montre ou une ceinture de préférence)
@@ -370,7 +371,7 @@ export function parseIntent(text: string, garments: Garment[]): ParsedIntent {
 
   if (/rendez|date\b|diner en amoureux/.test(t)) { context = 'rendez-vous'; label = 'Rendez-vous' }
   else if (/travail|bureau|boulot|reunion|entretien|client/.test(t)) { context = 'travail'; label = 'Au travail' }
-  else if (/soiree|diner|sortie|resto|restaurant|bar\b|club/.test(t)) { context = 'soiree'; label = 'Soirée' }
+  else if (/soiree|ce soir|diner|sortie|resto|restaurant|bar\b|club/.test(t)) { context = 'soiree'; label = 'Soirée' }
   else if (/week-?end/.test(t)) { context = 'weekend'; label = 'Week-end' }
   else if (/vacances|voyage|plage/.test(t)) { context = 'vacances'; label = 'Vacances' }
 
@@ -433,9 +434,9 @@ export function colorAdvice(text: string, garments: Garment[]): string | null {
   return `Avec « ${base.name} » (${colorName(base.color).toLowerCase()}), les meilleures associations de ton dressing : ${best.join(', ')}.` + (worst.length ? ` À éviter : ${worst.join(', ')}.` : '')
 }
 
-export function wardrobeInsights(garments: Garment[]): string {
+export function wardrobeInsights(garments: Garment[]): string[] {
   const g = garments.filter((x) => x.status !== 'archived')
-  if (g.length < 5) return 'Ton dressing est encore petit : ajoute au moins quelques hauts, bas et chaussures pour que je puisse t’aider.'
+  if (g.length < 5) return ['Ton dressing est encore petit : ajoute au moins quelques hauts, bas et chaussures pour que je puisse t’aider.']
   const out: string[] = []
   const has = (c: string[]) => g.some((x) => c.includes(x.category))
   const neutral = g.filter((x) => isNeutral(x.color) || colorFamily(x.color) === 'earth').length / g.length
@@ -448,5 +449,38 @@ export function wardrobeInsights(garments: Garment[]): string {
   if (tops > bottoms * 3 && bottoms > 0) out.push('Beaucoup de hauts pour peu de bas : un ou deux pantalons polyvalents équilibreraient.')
   const never = g.filter((x) => x.wornDates.length === 0).length
   if (never > 0) out.push(`${never} pièce${never > 1 ? 's' : ''} jamais portée${never > 1 ? 's' : ''} : dis-moi « habille-moi avec … » pour les remettre en jeu.`)
-  return out.join(' ')
+  return out
 }
+
+/* ---------- Références à une pièce (« que porter avec cette veste ? ») ---------- */
+
+export type Ref =
+  | { kind: 'no-ref' }
+  | { kind: 'none'; message: string }
+  | { kind: 'one'; garment: Garment }
+  | { kind: 'choose'; message: string; options: Garment[] }
+
+const REF_WORDS: [RegExp, CategoryId[], string][] = [
+  [/\bveste|blazer/, ['veste'], 'veste'], [/manteau/, ['manteau'], 'manteau'], [/blouson/, ['blouson'], 'blouson'],
+  [/\bpull\b/, ['pull'], 'pull'], [/chemise/, ['chemise'], 'chemise'], [/\bpolo/, ['polo'], 'polo'],
+  [/t-?shirt|tee-?shirt/, ['tshirt'], 't-shirt'], [/sweat/, ['sweat'], 'sweat'], [/pantalon|chino/, ['pantalon'], 'pantalon'],
+  [/\bjean/, ['jean'], 'jean'], [/\bshort/, ['short'], 'short'], [/costume/, ['costume'], 'costume'],
+  [/chaussures|mocassin|derby/, ['chaussures'], 'chaussures'], [/basket|sneaker/, ['baskets'], 'baskets'], [/bottine|boots?/, ['bottines'], 'bottines'],
+]
+
+export function resolveRef(text: string, garments: Garment[]): Ref {
+  const t = norm(text)
+  if (!/(avec|assort)/.test(t)) return { kind: 'no-ref' }
+  const named = findGarment(text, garments)
+  if (named) return { kind: 'one', garment: named }
+  const hit = REF_WORDS.find(([re]) => re.test(t))
+  if (!hit) return { kind: 'no-ref' }
+  const pool = garments.filter((g) => g.status === 'available' && hit[1].includes(g.category))
+  if (pool.length === 0) return { kind: 'none', message: `Je ne trouve pas de ${hit[2]} disponible dans ton dressing.` }
+  if (pool.length === 1) return { kind: 'one', garment: pool[0] }
+  return { kind: 'choose', message: `Tu as ${pool.length} pièces dans cette catégorie. Laquelle veux-tu porter ?`, options: pool.slice(0, 8) }
+}
+
+export const prefsOf = (s: Settings): StyleRequest['prefs'] => ({
+  styles: s.favStyles ?? [], colors: s.favColors ?? [], avoid: s.avoid ?? [], layers: s.layers ?? false,
+})

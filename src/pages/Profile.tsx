@@ -3,16 +3,17 @@ import { LocationPicker } from '../components/LocationPicker'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { OutfitCollage } from '../components/Look'
 import { ColorDot, Empty, Header, Icon, Segmented, Sheet, toast } from '../components/ui'
-import { CATEGORIES, CAT_BY_ID, STYLES, slotOf } from '../lib/constants'
+import { CATEGORIES, CAT_BY_ID, CONTEXTS, STYLES, slotOf } from '../lib/constants'
 import { colorName, NAMED_COLORS } from '../lib/colors'
-import { aiConfigured } from '../lib/ai'
+import { serverConfigured } from '../lib/ai'
+import { processBodyPhoto } from '../lib/photo'
 import { demoGarments } from '../lib/demo'
 import { supabase } from '../lib/supabase'
 import { usable, warmthOf, targetWarmth } from '../lib/stylist'
 import { useStore } from '../lib/store'
 import { fetchTripWeather } from '../lib/weather'
 import { cx, eur, parseYmd, ymd } from '../lib/utils'
-import type { CategoryId, Garment, GeoPoint } from '../types'
+import type { CategoryId, Context, Garment, GeoPoint } from '../types'
 
 type Sub = 'stats' | 'style' | 'calendar' | 'trip' | 'wish' | 'capsule' | 'settings'
 
@@ -158,7 +159,7 @@ function CalendarView() {
               </div>
             )}
             <div className="caps mb-3">{entry ? 'Remplacer par' : future ? 'Planifier' : 'Enregistrer'}</div>
-            {tryOn.length > 0 && <button className="btn-ghost mb-3 w-full" onClick={() => { logOutfit(sel, tryOn, { planned: future }); toast('Enregistré'); setSel(null) }}>Utiliser l’avatar actuel</button>}
+            {tryOn.length > 0 && <button className="btn-ghost mb-3 w-full" onClick={() => { logOutfit(sel, tryOn, { planned: future }); toast('Enregistré'); setSel(null) }}>Utiliser ma composition actuelle</button>}
             {outfits.map((o) => (
               <button key={o.id} onClick={() => { logOutfit(sel, o.itemIds, { planned: future, outfitId: o.id }); toast('Enregistré'); setSel(null) }} className="mb-2 flex w-full items-center justify-between rounded-xl border border-white/[0.07] px-4 py-3 text-left text-[13.5px] text-ivoire">{o.name}<Icon name="chevron" size={14} className="text-creme/30" /></button>
             ))}
@@ -305,6 +306,7 @@ function Settings() {
   const [loc, setLoc] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const file = useRef<HTMLInputElement>(null)
+  const photoRef = useRef<HTMLInputElement>(null)
   const notif = async () => {
     if (settings.notifications) return setSettings({ notifications: false })
     if (!('Notification' in window)) return toast('Notifications non prises en charge ici.')
@@ -323,9 +325,25 @@ function Settings() {
         <Row k="Suggestion du jour"><button onClick={notif} className={cx('chip', settings.notifications && 'chip-on')}>{settings.notifications ? 'Activées' : 'Activer'}</button></Row>
         <p className="mt-3 text-[11px] leading-relaxed text-creme/40">Envoyées à l’ouverture de l’app (tenue planifiée ou sélection météo). Les notifications en arrière-plan demandent un serveur push, non configuré ici.</p>
       </Block>
+      <Block title="Photo de référence (facultative)">
+        <div className="flex items-center gap-4">
+          {settings.photo ? <img src={settings.photo} alt="Ma photo" className="h-20 w-16 rounded-xl object-cover" /> : <div className="flex h-20 w-16 items-center justify-center rounded-xl border border-dashed border-white/15 text-creme/30"><Icon name="camera" size={20} /></div>}
+          <div className="flex flex-1 flex-col gap-2">
+            <button className="btn-ghost !py-2.5" onClick={() => photoRef.current?.click()}>{settings.photo ? 'Changer' : 'Ajouter'}</button>
+            {settings.photo && <button className="btn !py-2 text-creme/45" onClick={() => setSettings({ photo: '' })}>Retirer</button>}
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-creme/40">Affichée en miniature dans Composer. Elle reste sur cet appareil.</p>
+        <input ref={photoRef} type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { setSettings({ photo: await processBodyPhoto(f) }) } catch { toast('Photo illisible') } }} />
+      </Block>
       <Block title="Styliste IA">
-        <Row k="Utiliser l’IA"><button disabled={!aiConfigured} onClick={() => setSettings({ aiEnabled: !settings.aiEnabled })} className={cx('chip', settings.aiEnabled && aiConfigured && 'chip-on', !aiConfigured && 'opacity-40')}>{settings.aiEnabled && aiConfigured ? 'Active' : 'Inactive'}</button></Row>
-        <p className="mt-3 text-[11px] leading-relaxed text-creme/40">{aiConfigured ? 'Fonction serveur détectée. Seuls le nom, la catégorie et la couleur des pièces sont envoyés, jamais les photos.' : 'Non configurée : le styliste fonctionne en mode local. Voir le README pour brancher une clé API côté serveur.'}</p>
+        <Row k="Utiliser l’IA"><button onClick={() => setSettings({ aiEnabled: !settings.aiEnabled })} className={cx('chip', settings.aiEnabled && 'chip-on')}>{settings.aiEnabled ? 'Active' : 'Inactive'}</button></Row>
+        {settings.aiEnabled && (
+          <input className="field mt-4" type="password" autoComplete="off" placeholder="Clé API Anthropic (sk-ant-…)" value={settings.aiKey ?? ''} onChange={(e) => setSettings({ aiKey: e.target.value.trim() })} />
+        )}
+        <p className="mt-3 text-[11px] leading-relaxed text-creme/40">
+          Sans IA, le styliste est un moteur de règles (couleurs, météo, formalité) : utile, mais ce n’est pas de l’IA. Avec ta propre clé Anthropic, le nom, la catégorie, la couleur et la matière de tes pièces sont envoyés à Claude, jamais les photos. La clé reste sur cet appareil et chaque appel est facturé sur ton compte Anthropic.{serverConfigured && !settings.aiKey ? ' Une fonction serveur est détectée et sera utilisée.' : ''}
+        </p>
       </Block>
       <Block title="Données">
         <p className="mb-4 text-[11.5px] text-creme/45">{supabase ? 'Supabase détecté (synchronisation à brancher, voir README).' : 'Tout est stocké sur cet appareil.'}</p>
@@ -342,6 +360,8 @@ function Settings() {
   )
 }
 
+const AVOID: [CategoryId, string][] = [['short', 'Shorts'], ['jean', 'Jeans'], ['costume', 'Costumes'], ['sweat', 'Sweats'], ['baskets', 'Baskets'], ['polo', 'Polos']]
+
 function Prefs() {
   const { settings, setSettings } = useStore()
   const styles = settings.favStyles ?? []
@@ -353,6 +373,14 @@ function Prefs() {
     <div>
       <Block title="Styles favoris"><div className="flex flex-wrap gap-2">{STYLES.map((s) => <button key={s} onClick={() => setSettings({ favStyles: tg(styles, s) })} className={cx('chip', styles.includes(s) && 'chip-on')}>{s}</button>)}</div></Block>
       <Block title="Couleurs préférées"><div className="flex flex-wrap gap-3">{NAMED_COLORS.map((c) => <button key={c.name} onClick={() => setSettings({ favColors: tg(colors, c.name) })} aria-label={c.name}><ColorDot color={c.hex} size={28} ring={colors.includes(c.name)} /></button>)}</div></Block>
+      <Block title="Occasions habituelles"><div className="flex flex-wrap gap-2">{CONTEXTS.map((c) => <button key={c.id} onClick={() => setSettings({ favContexts: tg<Context>(settings.favContexts ?? [], c.id) })} className={cx('chip', (settings.favContexts ?? []).includes(c.id) && 'chip-on')}>{c.label}</button>)}</div></Block>
+      <Block title="Préférences vestimentaires">
+        <button onClick={() => setSettings({ layers: !settings.layers })} className="mb-4 flex w-full items-center justify-between text-left text-[13.5px] text-ivoire">J’aime superposer (veste, pull)<span className={cx('chip', settings.layers && 'chip-on')}>{settings.layers ? 'Oui' : 'Non'}</span></button>
+        <div className="caps mb-2 !text-creme/50">Je ne porte pas</div>
+        <div className="flex flex-wrap gap-2">{AVOID.map(([id, label]) => <button key={id} onClick={() => setSettings({ avoid: tg<CategoryId>(settings.avoid ?? [], id) })} className={cx('chip', (settings.avoid ?? []).includes(id) && 'chip-on')}>{label}</button>)}</div>
+      </Block>
+      <Block title="Marques préférées"><input className="field" placeholder="Ex. Sandro, Zadig, Church’s" value={(settings.favBrands ?? []).join(', ')} onChange={(e) => setSettings({ favBrands: e.target.value.split(',').map((x) => x.trimStart()).filter((x, i, a) => x !== '' || i < a.length - 1) })} /></Block>
+      <Block title="Budget par article (facultatif)"><input className="field" inputMode="numeric" placeholder="Ex. 150 (€)" value={settings.budget ?? ''} onChange={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ''), 10); setSettings({ budget: Number.isFinite(n) ? n : null }) }} /></Block>
       <Block title="Mes tailles"><div className="grid grid-cols-3 gap-3">{(['top', 'bottom', 'shoes'] as const).map((k) => <input key={k} className="field" placeholder={labels[k]} value={sizes[k]} onChange={(e) => setSettings({ sizes: { ...sizes, [k]: e.target.value } })} />)}</div></Block>
       <p className="px-1 text-[11.5px] leading-relaxed text-creme/40">Le styliste et les recommandations privilégient ces choix.</p>
     </div>

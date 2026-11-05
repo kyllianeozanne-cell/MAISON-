@@ -4,6 +4,7 @@ import { NavBar, type Tab } from './components/NavBar'
 import { Splash, ToastHost, toast } from './components/ui'
 import { Home } from './pages/Home'
 import { Profile } from './pages/Profile'
+import { Selection } from './pages/Selection'
 import { Stylist } from './pages/Stylist'
 import { TryOn } from './pages/TryOn'
 import { Wardrobe } from './pages/Wardrobe'
@@ -68,7 +69,7 @@ export default function App() {
     try { new Notification('MAISON', { body }); localStorage.setItem(key, ymd()) } catch { /* ignore */ }
   }, [hydrated, settings.notifications, weather, calendar, garments])
 
-  const tryLook = (l: { itemIds: string[] }) => { setTryOn(l.itemIds); setTab('tryon'); toast('Sur ton avatar') }
+  const tryLook = (l: { itemIds: string[] }) => { setTryOn(l.itemIds); setTab('tryon'); toast('Look prêt à composer') }
   const tryGarment = (g: Garment) => { if (!tryOn.includes(g.id)) toggleTryOn(g.id); setTab('tryon') }
 
   if (!hydrated || boot) return <Splash />
@@ -82,6 +83,7 @@ export default function App() {
             {tab === 'home' && <Home go={setTab} tryLook={tryLook} />}
             {tab === 'wardrobe' && <Wardrobe onTryGarment={tryGarment} />}
             {tab === 'tryon' && <TryOn goStylist={() => setTab('stylist')} />}
+            {tab === 'selection' && <Selection go={setTab} tryLook={tryLook} />}
             {tab === 'stylist' && <Stylist tryLook={tryLook} />}
             {tab === 'profile' && <Profile />}
           </motion.div>

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useMemo } from 'react'
-import { GarmentThumb } from './GarmentThumb'
+import { LookBoard } from './LookBoard'
 import { Icon } from './ui'
 import { slotOf } from '../lib/constants'
 import { cx } from '../lib/utils'
@@ -12,20 +12,9 @@ export function orderItems(items: Garment[]): Garment[] {
   return [...items].sort((a, b) => ORDER.indexOf(slotOf(a.category) as never) - ORDER.indexOf(slotOf(b.category) as never))
 }
 
-/** Représentation visuelle d'une tenue : collage des pièces sur fond neutre. */
+/** Représentation visuelle d'une tenue : planche lookbook. */
 export function OutfitCollage({ items, className }: { items: Garment[]; className?: string }) {
-  const shown = orderItems(items).slice(0, 6)
-  const cols = shown.length <= 1 ? 1 : shown.length <= 4 ? 2 : 3
-  return (
-    <div
-      className={cx('grid gap-px overflow-hidden rounded-maison bg-brun', className)}
-      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-    >
-      {shown.map((g) => (
-        <GarmentThumb key={g.id} garment={g} className="aspect-[4/5]" />
-      ))}
-    </div>
-  )
+  return <LookBoard items={orderItems(items)} className={className} />
 }
 
 export function CompatBadge({ score }: { score: number }) {
@@ -67,7 +56,7 @@ export function LookCard({
         <p className="mb-4 text-[12.5px] leading-relaxed text-creme/60">{look.reason}</p>
         {hasWeather && <CompatBadge score={look.score} />}
         <button onClick={() => onTry(look)} className="btn-ghost mt-5 w-full">
-          <Icon name="avatar" size={16} /> Essayer sur mon avatar
+          <Icon name="layers" size={16} /> Composer ce look
         </button>
       </div>
     </motion.article>

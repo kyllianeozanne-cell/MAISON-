@@ -4,24 +4,8 @@ import { idbStorage } from './db'
 import { slotOf } from './constants'
 import { uid, ymd } from './utils'
 import type {
-  AvatarConfig, CalendarEntry, Capsule, Context, Fit, Garment, Outfit, Settings, WishItem,
+  CalendarEntry, Capsule, Context, Garment, Outfit, Settings, WishItem,
 } from '../types'
-
-export const DEFAULT_AVATAR: AvatarConfig = {
-  height: 180,
-  build: 0.45,
-  shoulders: 0.5,
-  waist: 0.45,
-  legs: 0.5,
-  skin: '#e6b995',
-  hair: 'short',
-  hairColor: '#3a2a1e',
-  beard: 'none',
-  underwear: 'noir',
-  photo: '',
-  fit: {},
-  neck: 0.15,
-}
 
 export const DEFAULT_SETTINGS: Settings = {
   name: '',
@@ -39,7 +23,7 @@ interface Data {
   calendar: CalendarEntry[]
   wishlist: WishItem[]
   capsules: Capsule[]
-  avatar: AvatarConfig
+  selFavs: string[]
   settings: Settings
   tryOn: string[]
   onboarded: boolean
@@ -51,7 +35,7 @@ interface Actions {
   removeGarment: (id: string) => void
   setStatus: (id: string, status: Garment['status']) => void
 
-  saveOutfit: (name: string, itemIds: string[], context?: Context | '', favorite?: boolean, fit?: Record<string, Fit>) => string
+  saveOutfit: (name: string, itemIds: string[], context?: Context | '', favorite?: boolean) => string
   updateOutfit: (id: string, patch: Partial<Outfit>) => void
   toggleFavorite: (id: string) => void
   removeOutfit: (id: string) => void
@@ -66,7 +50,7 @@ interface Actions {
   updateCapsule: (id: string, patch: Partial<Capsule>) => void
   removeCapsule: (id: string) => void
 
-  setAvatar: (patch: Partial<AvatarConfig>) => void
+  toggleSelFav: (id: string) => void
   setSettings: (patch: Partial<Settings>) => void
 
   toggleTryOn: (garmentId: string) => void
@@ -87,7 +71,7 @@ const initial: Data = {
   calendar: [],
   wishlist: [],
   capsules: [],
-  avatar: DEFAULT_AVATAR,
+  selFavs: [],
   settings: DEFAULT_SETTINGS,
   tryOn: [],
   onboarded: false,
@@ -157,9 +141,9 @@ export const useStore = create<Store>()(
           tryOn: status === 'available' ? s.tryOn : s.tryOn.filter((i) => i !== id),
         })),
 
-      saveOutfit: (name, itemIds, context = '', favorite = false, fit) => {
+      saveOutfit: (name, itemIds, context = '', favorite = false) => {
         const id = uid()
-        const outfit: Outfit = { id, name, itemIds, favorite, context, note: '', fit, createdAt: Date.now() }
+        const outfit: Outfit = { id, name, itemIds, favorite, context, note: '', createdAt: Date.now() }
         set((s) => ({ outfits: [outfit, ...s.outfits] }))
         return id
       },
@@ -219,7 +203,7 @@ export const useStore = create<Store>()(
         set((s) => ({ capsules: s.capsules.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       removeCapsule: (id) => set((s) => ({ capsules: s.capsules.filter((c) => c.id !== id) })),
 
-      setAvatar: (patch) => set((s) => ({ avatar: { ...s.avatar, ...patch } })),
+      toggleSelFav: (id) => set((s) => { const f = s.selFavs ?? []; return { selFavs: f.includes(id) ? f.filter((x) => x !== id) : [...f, id] } }),
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
       toggleTryOn: (garmentId) =>
@@ -233,9 +217,9 @@ export const useStore = create<Store>()(
       setOnboarded: () => set({ onboarded: true }),
       exportData: () => {
         const s = get()
-        const { garments, outfits, calendar, wishlist, capsules, avatar, settings } = s
+        const { garments, outfits, calendar, wishlist, capsules, selFavs, settings } = s
         return JSON.stringify(
-          { app: 'maison', version: 1, exportedAt: new Date().toISOString(), garments, outfits, calendar, wishlist, capsules, avatar, settings },
+          { app: 'maison', version: 1, exportedAt: new Date().toISOString(), garments, outfits, calendar, wishlist, capsules, selFavs, settings },
           null,
           2,
         )
@@ -250,7 +234,7 @@ export const useStore = create<Store>()(
             calendar: d.calendar ?? [],
             wishlist: d.wishlist ?? [],
             capsules: d.capsules ?? [],
-            avatar: { ...DEFAULT_AVATAR, ...(d.avatar ?? {}) },
+            selFavs: d.selFavs ?? [],
             settings: { ...DEFAULT_SETTINGS, ...(d.settings ?? {}) },
             tryOn: [],
             onboarded: true,

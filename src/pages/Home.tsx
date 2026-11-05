@@ -4,8 +4,7 @@ import { GarmentThumb } from '../components/GarmentThumb'
 import { LocationPicker } from '../components/LocationPicker'
 import { CompatBadge, LookRow, OutfitCollage, orderItems } from '../components/Look'
 import { Icon, Section, Segmented, Spinner } from '../components/ui'
-import { slotOf } from '../lib/constants'
-import { homeSelections, suggest, type Tone } from '../lib/stylist'
+import { homeSelections, prefsOf, suggest, type Tone } from '../lib/stylist'
 import { useStore } from '../lib/store'
 import { isWet } from '../lib/weather'
 import { useWeather } from '../lib/weatherStore'
@@ -27,22 +26,16 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function Hero({ look, garments, onTry, hasWeather }: { look: Look; garments: Garment[]; onTry: (l: Look) => void; hasWeather: boolean }) {
   const items = orderItems(look.itemIds.map((id) => garments.find((g) => g.id === id)).filter((g): g is Garment => !!g))
-  const main = items.find((g) => slotOf(g.category) === 'outer' || slotOf(g.category) === 'suit') ?? items[0]
-  const rest = items.filter((g) => g.id !== main.id)
-  const side = rest.slice(0, 3)
   return (
-    <div className="card overflow-hidden p-3">
-      <div className="grid grid-cols-[1fr_86px] gap-2">
-        <GarmentThumb garment={main} className="aspect-[3/4] rounded-xl" />
-        <div className="flex flex-col gap-2">
-          {side.map((g) => <GarmentThumb key={g.id} garment={g} className="aspect-square rounded-xl" />)}
-          {rest.length > 3 && <div className="flex flex-1 items-center justify-center rounded-xl bg-brun text-[12px] text-champagne">+{rest.length - 3}</div>}
+    <div className="card overflow-hidden">
+      <OutfitCollage items={items} className="rounded-none" />
+      <div className="p-5">
+        <ul className="mb-3 space-y-1">{items.map((g) => <li key={g.id} className="text-[13px] text-ivoire">{g.name}</li>)}</ul>
+        <p className="text-[12.5px] leading-relaxed text-creme/60">{look.reason}</p>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          {hasWeather ? <CompatBadge score={look.score} /> : <span />}
+          <button onClick={() => onTry(look)} className="btn-gold !px-4 !py-2.5"><Icon name="layers" size={14} /> Composer</button>
         </div>
-      </div>
-      <p className="mt-4 px-1 text-[12.5px] leading-relaxed text-creme/60">{look.reason}</p>
-      <div className="mt-4 flex items-center justify-between gap-3 px-1 pb-1">
-        {hasWeather ? <CompatBadge score={look.score} /> : <span />}
-        <button onClick={() => onTry(look)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-champagne text-noir" aria-label="Essayer"><Icon name="chevron" size={18} stroke={1.6} /></button>
       </div>
     </div>
   )
@@ -54,7 +47,7 @@ export function Home({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: { ite
   const [loc, setLoc] = useState(false)
   const [seed, setSeed] = useState(0)
   const [rtab, setRtab] = useState<RTab>('today')
-  const prefs = useMemo(() => ({ styles: settings.favStyles ?? [], colors: settings.favColors ?? [] }), [settings.favStyles, settings.favColors])
+  const prefs = useMemo(() => prefsOf(settings), [settings])
 
   useEffect(() => { load() }, [load, settings.location])
 

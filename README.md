@@ -1,6 +1,6 @@
 # MAISON — dressing virtuel
 
-React + TypeScript + Tailwind + Framer Motion + React Three Fiber. Mobile d'abord.
+React + TypeScript + Tailwind + Framer Motion. Mobile d'abord.
 
 ## Lancer
 
@@ -16,20 +16,23 @@ Node 18+ requis. Au premier lancement : prénom, localisation facultative, puis 
 
 - Dressing complet : ajout par photo / galerie / lot / manuel, fiche détaillée, filtres, recherche, lavage, archive, suppression.
 - Détourage automatique du fond (fonctionne sur fond uni) et détection de la couleur dominante.
-- Avatar 3D paramétrique (taille, morphologie, proportions, teint, coiffure, barbe), rotation au doigt, fallback 2D sans WebGL.
-- Essayage par emplacement (swipe horizontal), tenues enregistrées, favoris, partage, « autre combinaison ».
+- Composer : planche lookbook (détourage, ombres douces), multi-sélection par catégorie, lookbook enregistré, photo personnelle facultative.
+- Sélection : boutique personnelle (indispensables, style, complète tes tenues, découvertes) calculée depuis ton dressing, tes styles, couleurs, marques et budget.
 - Styliste local : météo, ressenti, pluie, saison, contexte, harmonie des couleurs, formalité, pièces oubliées. Ne propose que des pièces disponibles que tu possèdes.
 - Météo réelle (Open-Meteo, sans clé), accueil, recommandations, calendrier, statistiques, valise, wishlist, capsules, export / import JSON.
 - Données persistantes dans IndexedDB sur l'appareil.
 
 ## Limites à connaître
 
-- L'avatar montre couleurs et volumes ; les vêtements sont des coques colorées, **pas** un ajustement réel (pas de données de patron ni de simulation textile).
+- Aucune API commerciale n'est branchée : la Sélection ne montre que des recherches chez des marchands tant que `public/catalog.json` est vide. Ajoute-y uniquement des produits réels (prix, image, lien vérifiés ; format dans `src/lib/catalog.ts`).
 - Les notifications se déclenchent à l'ouverture de l'app (pas de push en arrière-plan).
 - Le compte utilisateur et la synchro Supabase ne sont pas branchés dans l'interface : le schéma (`supabase/schema.sql`) et le client (`src/lib/supabase.ts`) sont prêts.
 - Ce code n'a pas pu être compilé ni testé dans l'environnement où il a été écrit (réseau npm bloqué) : lance `npm run build` et signale-moi les erreurs éventuelles.
 
 ## Styliste IA (facultatif)
+
+Sans IA, le styliste est un moteur de règles et s'annonce comme tel. Option 1 : colle ta clé Anthropic dans Profil → Réglages (appels directs depuis l'appareil, facturés sur ton compte). Option 2 : serveur Supabase ci-dessous.
+
 
 1. Crée un projet Supabase, exécute `supabase/schema.sql`.
 2. `supabase functions deploy stylist` puis `supabase secrets set ANTHROPIC_API_KEY=...` (la clé ne quitte jamais le serveur).

@@ -33,13 +33,13 @@ html, body, #root {
     @apply font-serif font-light text-ivoire leading-[1.05];
   }
   .card {
-    @apply rounded-maison bg-anthracite shadow-depth border border-white/[0.04];
+    @apply rounded-maison bg-gradient-to-b from-[#1d1d1b] to-anthracite shadow-depth border border-champagne/[0.09];
   }
   .hairline {
     @apply border-t border-champagne/15;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[12px] uppercase tracking-[0.18em] transition active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[11.5px] uppercase tracking-[0.2em] transition active:scale-[0.98];
   }
   .btn-gold {
     @apply btn bg-champagne text-noir font-normal;

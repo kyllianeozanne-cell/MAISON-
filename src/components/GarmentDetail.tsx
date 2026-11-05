@@ -68,7 +68,7 @@ export function GarmentDetail({ garment, onClose, onTry }: { garment: Garment | 
 
           <div className="grid grid-cols-2 gap-3">
             <button className="btn-gold col-span-2" onClick={() => { onTry(g); close() }}>
-              <Icon name="avatar" size={16} /> Essayer sur l’avatar
+              <Icon name="layers" size={16} /> Ajouter au look
             </button>
             <button className="btn-ghost" onClick={() => { logOutfit(ymd(), Array.from(new Set([...(useStore.getState().calendar.find((e) => e.date === ymd() && !e.planned)?.itemIds ?? []), g.id]))); toast('Ajoutée à la tenue du jour') }}>
               <Icon name="check" size={16} /> Portée aujourd’hui
