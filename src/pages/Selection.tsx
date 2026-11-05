@@ -1,17 +1,18 @@
 import { motion } from 'framer-motion'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { LookBoard } from '../components/LookBoard'
 import { GarmentThumb } from '../components/GarmentThumb'
 import type { Tab } from '../components/NavBar'
 import { readableOn } from '../lib/colors'
-import { ColorDot, Empty, Header, Icon, Sheet } from '../components/ui'
+import { ColorDot, Empty, Header, Icon, Sheet, toast } from '../components/ui'
 import { MERCHANTS, useCatalog, type Product } from '../lib/catalog'
-import { SLOT_LABEL, slotOf } from '../lib/constants'
+import { dominantColor, processPhoto } from '../lib/photo'
+import { CATEGORIES, SLOT_LABEL, slotOf } from '../lib/constants'
 import { NAMED_COLORS, colorName } from '../lib/colors'
 import { SECTIONS, buildNeeds, matchProducts, ownStyles, pairsFor, type Need } from '../lib/selection'
 import { useStore } from '../lib/store'
 import { cx, eur } from '../lib/utils'
-import type { Garment, Slot, Style } from '../types'
+import type { CategoryId, Garment, Slot, Style } from '../types'
 
 const SLOTS: Slot[] = ['top', 'bottom', 'outer', 'shoes', 'accessory', 'suit']
 const SLOT_SHORT: Record<Slot, string> = { top: 'Hauts', bottom: 'Bas', outer: 'Vestes', shoes: 'Chaussures', accessory: 'Accessoires', suit: 'Costumes' }
@@ -22,9 +23,13 @@ interface Filters { slot: Slot | ''; color: string; style: Style | ''; brand: st
 const NO_FILTER: Filters = { slot: '', color: '', style: '', brand: '', maxPrice: null, favs: false }
 
 export function Selection({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: { itemIds: string[] }) => void }) {
-  const { garments, settings, selFavs, toggleSelFav } = useStore()
+  const { garments, settings, selFavs, toggleSelFav, shopItems, removeShopItem } = useStore()
   const favs = selFavs ?? []
-  const { products, ready } = useCatalog()
+  const cat = useCatalog()
+  const ready = cat.ready
+  const mine = shopItems ?? []
+  const products = useMemo(() => [...mine, ...cat.products], [mine, cat.products])
+  const [addOpen, setAddOpen] = useState(false)
   const [f, setF] = useState<Filters>(NO_FILTER)
   const [open, setOpen] = useState<Need | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -72,6 +77,28 @@ export function Selection({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: 
         {SLOTS.filter((s) => needs.some((n) => slotOf(n.cat) === s)).map((s) => <button key={s} onClick={() => setF({ ...f, slot: f.slot === s ? '' : s })} className={cx('chip', f.slot === s && 'chip-on')}>{SLOT_SHORT[s]}</button>)}
       </div>
 
+      <div className="px-6 pt-4"><button onClick={() => setAddOpen(true)} className="btn-ghost w-full !py-2.5"><Icon name="plus" size={15} /> Ajouter un article trouvé en boutique</button></div>
+      {mine.length > 0 && (
+        <section className="mt-8">
+          <div className="px-6"><div className="caps">Mes trouvailles</div><p className="mt-1.5 font-serif text-[19px] italic text-creme/60">Les articles que tu as repérés.</p></div>
+          <div className="no-scrollbar mt-4 flex scroll-px-6 gap-4 overflow-x-auto px-6 pb-2">
+            {mine.map((p) => (
+              <article key={p.id} className="card w-[46%] max-w-[200px] shrink-0 overflow-hidden">
+                <img src={p.image} alt={p.name} loading="lazy" className="aspect-[4/5] w-full bg-creme object-cover" />
+                <div className="p-3">
+                  <div className="line-clamp-2 font-serif text-[15px] leading-tight text-ivoire">{p.name}</div>
+                  <div className="mt-1 text-[11px] text-creme/50">{[p.brand, p.price ? eur(p.price) : ''].filter(Boolean).join(' · ')}</div>
+                  <div className="mt-3 flex gap-2">
+                    {p.url && <a href={p.url} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-full border border-champagne/40 py-1.5 text-center text-[10px] uppercase tracking-[0.14em] text-champagne">Voir</a>}
+                    <button onClick={() => removeShopItem(p.id)} aria-label="Retirer" className="rounded-full border border-white/10 px-2.5 text-creme/45"><Icon name="trash" size={13} /></button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {visible.length === 0 && <p className="px-6 py-16 text-center text-[13px] text-creme/45">Aucune pièce ne correspond à ces filtres.</p>}
 
       {SECTIONS.map((sec) => {
@@ -100,6 +127,8 @@ export function Selection({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: 
       <Sheet open={!!open} onClose={() => setOpen(null)} title={open?.title} tall>
         {open && <Detail n={open} garments={own} products={matched.get(open.id) ?? []} brand={(settings.favBrands ?? [])[0]} fav={favs.includes(open.id)} onFav={() => toggleSelFav(open.id)} onTry={(ids) => { setOpen(null); tryLook({ itemIds: ids }) }} />}
       </Sheet>
+
+      <AddItem open={addOpen} onClose={() => setAddOpen(false)} />
 
       <Sheet open={filterOpen} onClose={() => setFilterOpen(false)} title="Filtres">
         <div className="caps mb-2">Catégorie</div>
@@ -214,5 +243,46 @@ function Detail({ n, garments, products, brand, fav, onFav, onTry }: { n: Need; 
         {pairs.length > 1 && <button className="btn-gold" onClick={() => onTry(pairs.filter((g, i, a) => a.findIndex((x) => slotOf(x.category) === slotOf(g.category)) === i).map((g) => g.id))}>Voir mes associations</button>}
       </div>
     </div>
+  )
+}
+
+function AddItem({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const addShopItem = useStore((s) => s.addShopItem)
+  const file = useRef<HTMLInputElement>(null)
+  const [image, setImage] = useState('')
+  const [color, setColor] = useState('#8b8b8b')
+  const [name, setName] = useState('')
+  const [brand, setBrand] = useState('')
+  const [price, setPrice] = useState('')
+  const [url, setUrl] = useState('')
+  const [category, setCategory] = useState<CategoryId>('chemise')
+  const pick = async (f: File) => {
+    try { const p = await processPhoto(f, { cutout: false }); setImage(p); setColor(await dominantColor(p).catch(() => '#8b8b8b')) } catch { toast('Image illisible') }
+  }
+  const save = () => {
+    if (!image || !name.trim()) return toast('Ajoute une photo et un nom.')
+    let link = url.trim()
+    if (link && !/^https?:\/\//i.test(link)) link = `https://${link}`
+    let merchant = ''
+    try { merchant = link ? new URL(link).hostname.replace(/^www\./, '') : '' } catch { link = '' }
+    addShopItem({ name: name.trim(), brand: brand.trim(), price: parseFloat(price.replace(',', '.')) || 0, category, color, styles: [], image, url: link, merchant })
+    setImage(''); setName(''); setBrand(''); setPrice(''); setUrl(''); onClose(); toast('Article ajouté')
+  }
+  return (
+    <Sheet open={open} onClose={onClose} title="Article trouvé" tall>
+      <p className="mb-4 text-[12px] leading-relaxed text-creme/50">Zara, H&M, Kiabi, New Yorker… : ajoute la photo (capture d’écran ou galerie) et le lien de la fiche. L’article apparaît dans ta Sélection, avec le prix que tu indiques.</p>
+      <button onClick={() => file.current?.click()} className="mb-4 flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/15 bg-noir text-creme/40">
+        {image ? <img src={image} alt="" className="h-full w-full object-contain" /> : <span className="flex items-center gap-2 text-[12px]"><Icon name="image" size={18} /> Choisir une photo</span>}
+      </button>
+      <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pick(f) }} />
+      <input className="field mb-3" placeholder="Nom de l’article" value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="mb-3 grid grid-cols-2 gap-3">
+        <input className="field" placeholder="Marque" value={brand} onChange={(e) => setBrand(e.target.value)} />
+        <input className="field" inputMode="decimal" placeholder="Prix (€)" value={price} onChange={(e) => setPrice(e.target.value)} />
+      </div>
+      <input className="field mb-3" inputMode="url" autoCapitalize="none" placeholder="Lien de la fiche produit" value={url} onChange={(e) => setUrl(e.target.value)} />
+      <select className="field mb-6" value={category} onChange={(e) => setCategory(e.target.value as CategoryId)}>{CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
+      <button className="btn-gold w-full" onClick={save}>Ajouter à ma Sélection</button>
+    </Sheet>
   )
 }

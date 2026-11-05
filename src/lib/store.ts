@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { idbStorage } from './db'
 import { slotOf } from './constants'
 import { uid, ymd } from './utils'
+import type { Product } from './catalog'
 import type {
   CalendarEntry, Capsule, Context, Garment, Outfit, Settings, WishItem,
 } from '../types'
@@ -24,6 +25,7 @@ interface Data {
   wishlist: WishItem[]
   capsules: Capsule[]
   selFavs: string[]
+  shopItems: Product[]
   settings: Settings
   tryOn: string[]
   onboarded: boolean
@@ -51,6 +53,8 @@ interface Actions {
   removeCapsule: (id: string) => void
 
   toggleSelFav: (id: string) => void
+  addShopItem: (p: Omit<Product, 'id' | 'checkedAt'>) => void
+  removeShopItem: (id: string) => void
   setSettings: (patch: Partial<Settings>) => void
 
   toggleTryOn: (garmentId: string) => void
@@ -72,6 +76,7 @@ const initial: Data = {
   wishlist: [],
   capsules: [],
   selFavs: [],
+  shopItems: [],
   settings: DEFAULT_SETTINGS,
   tryOn: [],
   onboarded: false,
@@ -203,6 +208,8 @@ export const useStore = create<Store>()(
         set((s) => ({ capsules: s.capsules.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       removeCapsule: (id) => set((s) => ({ capsules: s.capsules.filter((c) => c.id !== id) })),
 
+      addShopItem: (p) => set((s) => ({ shopItems: [{ ...p, id: uid(), checkedAt: ymd() }, ...(s.shopItems ?? [])] })),
+      removeShopItem: (id) => set((s) => ({ shopItems: (s.shopItems ?? []).filter((x) => x.id !== id) })),
       toggleSelFav: (id) => set((s) => { const f = s.selFavs ?? []; return { selFavs: f.includes(id) ? f.filter((x) => x !== id) : [...f, id] } }),
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
@@ -217,9 +224,9 @@ export const useStore = create<Store>()(
       setOnboarded: () => set({ onboarded: true }),
       exportData: () => {
         const s = get()
-        const { garments, outfits, calendar, wishlist, capsules, selFavs, settings } = s
+        const { garments, outfits, calendar, wishlist, capsules, selFavs, shopItems, settings } = s
         return JSON.stringify(
-          { app: 'maison', version: 1, exportedAt: new Date().toISOString(), garments, outfits, calendar, wishlist, capsules, selFavs, settings },
+          { app: 'maison', version: 1, exportedAt: new Date().toISOString(), garments, outfits, calendar, wishlist, capsules, selFavs, shopItems, settings },
           null,
           2,
         )
@@ -235,6 +242,7 @@ export const useStore = create<Store>()(
             wishlist: d.wishlist ?? [],
             capsules: d.capsules ?? [],
             selFavs: d.selFavs ?? [],
+            shopItems: d.shopItems ?? [],
             settings: { ...DEFAULT_SETTINGS, ...(d.settings ?? {}) },
             tryOn: [],
             onboarded: true,
