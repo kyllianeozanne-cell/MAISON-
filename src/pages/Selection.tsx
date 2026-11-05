@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
 import { useMemo, useState } from 'react'
 import { LookBoard } from '../components/LookBoard'
-import { GarmentThumb, Silhouette } from '../components/GarmentThumb'
+import { GarmentThumb } from '../components/GarmentThumb'
 import type { Tab } from '../components/NavBar'
+import { readableOn } from '../lib/colors'
 import { ColorDot, Empty, Header, Icon, Sheet } from '../components/ui'
 import { MERCHANTS, useCatalog, type Product } from '../lib/catalog'
 import { SLOT_LABEL, slotOf } from '../lib/constants'
@@ -82,7 +83,7 @@ export function Selection({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: 
               <div className="caps">{sec.title}</div>
               <p className="mt-1.5 font-serif text-[19px] italic leading-snug text-creme/60">{sec.sub}</p>
             </div>
-            <div className="no-scrollbar mt-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-2">
+            <div className="no-scrollbar mt-4 flex snap-x snap-mandatory scroll-px-6 gap-4 overflow-x-auto px-6 pb-2">
               {list.map((n) => <NeedCard key={n.id} n={n} products={matched.get(n.id) ?? []} fav={favs.includes(n.id)} onFav={() => toggleSelFav(n.id)} onOpen={() => setOpen(n)} />)}
             </div>
           </section>
@@ -130,15 +131,21 @@ function NeedCard({ n, products, fav, onFav, onOpen }: { n: Need; products: Prod
   return (
     <motion.article initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="card w-[78%] max-w-[320px] shrink-0 snap-start overflow-hidden">
       <button onClick={onOpen} className="block w-full text-left">
-        <div className="relative aspect-[4/5] bg-gradient-to-b from-[#ece4d6] to-[#d8cdb9]">
-          {p ? <img src={p.image} alt={p.name} loading="lazy" className="h-full w-full object-contain p-4" /> : <div className="flex h-full items-center justify-center p-[18%]"><Silhouette category={n.cat} color={n.color} className="h-full w-full drop-shadow-[0_10px_14px_rgba(40,30,20,0.3)]" /></div>}
-          {!p && <span className="absolute left-3 top-3 rounded-full bg-noir/70 px-2.5 py-1 text-[9px] uppercase tracking-[0.16em] text-champagne">Pièce à trouver</span>}
+        <div className="relative flex aspect-[4/5] flex-col bg-[#d8cdb9]">
+          {p ? <img src={p.image} alt={p.name} loading="lazy" className="h-full w-full bg-creme object-contain p-4" /> : (
+            <>
+              <div className="relative flex flex-[1.6] items-center justify-center px-5 text-center" style={{ background: `linear-gradient(160deg, ${n.color}, ${n.color}dd)` }}>
+                <span className="font-serif text-[26px] italic leading-tight" style={{ color: readableOn(n.color) }}>{n.title}</span>
+                <span className="absolute left-3 top-3 rounded-full bg-noir/70 px-2.5 py-1 text-[9px] uppercase tracking-[0.16em] text-champagne">Pièce à trouver</span>
+              </div>
+              {n.pairs.length > 0 && (
+                <div className="flex flex-1 gap-1.5 p-1.5">
+                  {n.pairs.slice(0, 3).map((g) => <div key={g.id} className="relative flex-1 overflow-hidden rounded-lg bg-creme">{g.photo ? <img src={g.photo} alt={g.name} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: 'center 35%' }} /> : <div className="h-full" style={{ background: g.color }} />}</div>)}
+                </div>
+              )}
+            </>
+          )}
         </div>
-        {n.pairs.length > 0 && (
-          <div className="flex gap-1.5 border-b border-white/[0.05] p-2.5">
-            {n.pairs.slice(0, 4).map((g) => <GarmentThumb key={g.id} garment={g} className="aspect-square w-[22%] rounded-md" />)}
-          </div>
-        )}
       </button>
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
@@ -162,8 +169,8 @@ function Detail({ n, garments, products, brand, fav, onFav, onTry }: { n: Need; 
   const q = `${n.noun} ${n.colorName}`
   return (
     <div>
-      <LookBoard items={lookItems} className="mx-auto mb-5 w-[70%]" />
-      <p className="mb-1 text-center text-[10px] uppercase tracking-[0.16em] text-creme/35">Aperçu : silhouette de la pièce avec tes vêtements</p>
+      <LookBoard items={lookItems} className="mx-auto mb-2 w-[78%]" />
+      <p className="mb-1 text-center text-[10px] uppercase tracking-[0.16em] text-creme/35">Aperçu : la couleur recommandée avec tes vêtements</p>
       <p className="my-5 text-[13.5px] leading-relaxed text-ivoire">{n.why}</p>
 
       {pairs.length > 0 && (

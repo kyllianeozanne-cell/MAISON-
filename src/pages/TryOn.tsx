@@ -96,7 +96,7 @@ export function TryOn({ goStylist }: { goStylist: () => void }) {
       <div className="no-scrollbar mt-6 flex gap-2 overflow-x-auto px-6">
         {slots.map((s) => <button key={s} onClick={() => setSlot(s)} className={cx('chip', activeSlot === s && 'chip-on')}>{LABEL[s]}</button>)}
       </div>
-      <div className="no-scrollbar mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-6 pb-2">
+      <div className="no-scrollbar mt-4 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2">
         {list.map((g) => {
           const on = wornIds.has(g.id)
           return (

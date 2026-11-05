@@ -1,80 +1,39 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Silhouette } from './GarmentThumb'
-import { cutoutDataUrl } from '../lib/photo'
+import { readableOn } from '../lib/colors'
 import { slotOf } from '../lib/constants'
 import { cx } from '../lib/utils'
 import type { Garment } from '../types'
 
-const results = new Map<string, string>()
-const pending = new Map<string, Promise<void>>()
-const keyOf = (g: Garment) => `${g.id}:${g.photo.length}`
-
-function useCutouts(items: Garment[]) {
-  const [, force] = useState(0)
-  useEffect(() => {
-    let alive = true
-    items.forEach((g) => {
-      if (!g.photo) return
-      const key = keyOf(g)
-      if (results.has(key)) return
-      let p = pending.get(key)
-      if (!p) {
-        p = cutoutDataUrl(g.photo).catch(() => g.photo).then((u) => { results.set(key, u) })
-        pending.set(key, p)
-      }
-      p.then(() => { if (alive) force((n) => n + 1) })
-    })
-    return () => { alive = false }
-  }, [items])
-  return (g: Garment) => (g.photo ? results.get(keyOf(g)) ?? '' : '')
-}
-
-interface Box { l: number; t: number; w: number; h: number }
-interface Placed { g: Garment; b: Box; z: number }
-
-/** Disposition « flat lay » éditoriale, recentrée et agrandie selon les pièces présentes. */
-function layout(items: Garment[]): Placed[] {
-  const by = (s: string) => items.filter((g) => slotOf(g.category) === s)
-  const outer = [...by('outer'), ...by('suit')][0]
-  const top = by('top')[0]
-  const bottom = by('bottom')[0]
-  const shoes = by('shoes')[0]
-  const acc = by('accessory').slice(0, 4)
-  const raw: Placed[] = []
-  if (outer) raw.push({ g: outer, b: { l: 3, t: 3, w: 52, h: 46 }, z: 2 })
-  if (top) raw.push({ g: top, b: outer ? { l: 6, t: 46, w: 42, h: 28 } : { l: 4, t: 4, w: 50, h: 44 }, z: 1 })
-  if (bottom) raw.push({ g: bottom, b: { l: 48, t: 4, w: 48, h: 62 }, z: 1 })
-  if (shoes) raw.push({ g: shoes, b: outer || top ? { l: 6, t: 76, w: 44, h: 20 } : { l: 6, t: 60, w: 44, h: 30 }, z: 1 })
-  acc.forEach((g, i) => raw.push({ g, b: { l: 54 + (i % 2) * 22, t: 70 + Math.floor(i / 2) * 14, w: 20, h: 14 }, z: 3 }))
-  if (raw.length === 0) return []
-  const minL = Math.min(...raw.map((p) => p.b.l))
-  const minT = Math.min(...raw.map((p) => p.b.t))
-  const bw = Math.max(...raw.map((p) => p.b.l + p.b.w)) - minL
-  const bh = Math.max(...raw.map((p) => p.b.t + p.b.h)) - minT
-  const s = Math.min(92 / bw, 92 / bh, 1.7)
-  const ox = 4 + (92 - bw * s) / 2
-  const oy = 4 + (92 - bh * s) / 2
-  return raw.map((p) => ({ ...p, b: { l: ox + (p.b.l - minL) * s, t: oy + (p.b.t - minT) * s, w: p.b.w * s, h: p.b.h * s } }))
-}
-
-export function LookBoard({ items, className }: { items: Garment[]; className?: string }) {
-  const cut = useCutouts(items)
-  const placed = useMemo(() => layout(items), [items])
+/** Tuile d'une pièce : sa photo, ou un aplat de sa couleur avec son nom. */
+function Tile({ g, className }: { g: Garment; className?: string }) {
   return (
-    <div className={cx('relative aspect-[4/5] overflow-hidden rounded-maison bg-gradient-to-b from-[#ece4d6] to-[#d8cdb9]', className)}>
-      <div className="absolute inset-x-[10%] bottom-[4%] h-[3%] rounded-[50%] bg-black/10 blur-xl" />
-      {placed.map(({ g, b, z }) => {
-        const src = cut(g) || g.photo
-        return (
-          <div key={g.id} className="absolute" style={{ left: `${b.l}%`, top: `${b.t}%`, width: `${b.w}%`, height: `${b.h}%`, zIndex: z }}>
-            {g.photo ? (
-              <img src={src} alt={g.name} draggable={false} className="h-full w-full object-contain" style={{ filter: 'drop-shadow(0 8px 10px rgba(40,30,20,0.28))' }} />
-            ) : (
-              <Silhouette category={g.category} color={g.color} className="h-full w-full drop-shadow-[0_8px_10px_rgba(40,30,20,0.28)]" />
-            )}
-          </div>
-        )
-      })}
+    <div className={cx('relative min-h-0 overflow-hidden rounded-[10px] bg-[#f3eee4] shadow-[0_6px_14px_rgba(40,30,20,0.22)]', className)}>
+      {g.photo ? (
+        <img src={g.photo} alt={g.name} draggable={false} loading="lazy" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: 'center 35%' }} />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center p-2 text-center font-serif text-[13px] italic leading-tight" style={{ background: g.color, color: readableOn(g.color) }}>
+          {g.name}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Planche façon lookbook : pièces rangées en deux colonnes, sans chevauchement. */
+export function LookBoard({ items, className }: { items: Garment[]; className?: string }) {
+  const by = (s: string) => items.filter((g) => slotOf(g.category) === s)
+  const left = [...by('outer'), ...by('suit'), ...by('top')].slice(0, 2)
+  const right = [...by('bottom'), ...by('shoes')].slice(0, 2)
+  const acc = by('accessory').slice(0, 3)
+  const rest = items.filter((g) => !left.includes(g) && !right.includes(g) && !acc.includes(g)).slice(0, 2)
+  const l = left.length ? left : rest
+  const r = right.length ? right : left.length ? rest : []
+  return (
+    <div className={cx('relative flex aspect-[4/5] flex-col gap-[2.5%] overflow-hidden rounded-maison bg-gradient-to-b from-[#ece4d6] to-[#d8cdb9] p-[4%]', className)}>
+      <div className="flex min-h-0 flex-1 gap-[3%]">
+        {l.length > 0 && <div className="flex min-w-0 flex-1 flex-col gap-[3%]">{l.map((g, i) => <Tile key={g.id} g={g} className={cx('flex-1', i === 0 && l.length > 1 && 'flex-[1.25]')} />)}</div>}
+        {r.length > 0 && <div className="flex min-w-0 flex-1 flex-col gap-[3%]">{r.map((g, i) => <Tile key={g.id} g={g} className={cx('flex-1', i === 0 && r.length > 1 && 'flex-[2]')} />)}</div>}
+      </div>
+      {acc.length > 0 && <div className="flex h-[19%] shrink-0 gap-[3%]">{acc.map((g) => <Tile key={g.id} g={g} className="flex-1" />)}</div>}
     </div>
   )
 }
