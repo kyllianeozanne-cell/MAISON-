@@ -334,7 +334,7 @@ export function explain(items: Garment[], w: Weather | null, req: StyleRequest):
 
 export function weatherCompat(items: Garment[], w: Weather | null, req: StyleRequest): number {
   if (!w) return 0
-  const c = scoreCandidate(items, w, req, req.date ?? new Date())
+  const c = scoreCandidate(items, w, req, req.date ?? new Date(), tasteOf(items))
   return Math.round(c.weatherScore * 100)
 }
 
