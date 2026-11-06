@@ -40,9 +40,34 @@ const SEEDS: Seed[] = [
   { name: 'Montre à bracelet cuir', category: 'montre', sub: 'Habillée', brand: 'Jaeger-LeCoultre', color: '#c5ad83', material: 'Cuir', size: 'U', seasons: ALL, styles: ['classique', 'old money'], formality: 4, price: 0 },
 ]
 
+const W = (name: string, category: CategoryId, brand: string, color: string, material: string, seasons: Season[], styles: Style[], formality: 1 | 2 | 3 | 4 | 5, price: number, sub = ''): Seed => ({ name, category, sub, brand, color, material, size: 'M', seasons, styles, formality, price })
+
+const SEEDS_F: Seed[] = [
+  W('Blouse blanche fluide', 'blouse', 'Sézane', '#f6f4ee', 'Soie', ALL, ['classique', 'business'], 4, 110),
+  W('T-shirt blanc', 'tshirt', 'Uniqlo', '#f6f4ee', 'Coton', ['printemps', 'ete', 'automne'], ['casual'], 2, 15),
+  W('Pull écru en maille', 'pull', 'Massimo Dutti', '#e9e0cc', 'Laine', ['automne', 'hiver'], ['old money', 'casual'], 3, 79),
+  W('Pull marine col V', 'pull', 'Sandro', '#1c2b4a', 'Cachemire', ['automne', 'hiver'], ['classique', 'old money'], 4, 220),
+  W('Jean droit bleu', 'jean', 'Levi’s', '#3e6ba8', 'Denim', ALL, ['casual'], 2, 110),
+  W('Pantalon tailleur noir', 'pantalon', 'Mango', '#161616', 'Laine', ['automne', 'hiver', 'printemps'], ['business', 'classique'], 5, 69),
+  W('Jupe plissée camel', 'jupe', 'Zara', '#b58a56', 'Polyester', ['printemps', 'automne'], ['classique', 'old money'], 3, 39),
+  W('Petite robe noire', 'robe', 'Maje', '#161616', 'Crêpe', ALL, ['soiree', 'classique'], 4, 230),
+  W('Robe midi verte', 'robe', 'Sézane', '#3f6b4c', 'Viscose', ['printemps', 'ete', 'automne'], ['casual', 'classique'], 3, 150),
+  W('Combinaison kaki', 'combinaison', 'Mango', '#6b6a46', 'Coton', ['printemps', 'ete', 'automne'], ['casual', 'soiree'], 3, 80),
+  W('Ensemble tailleur beige', 'ensemble', 'Massimo Dutti', '#cdb994', 'Lin', ['printemps', 'ete'], ['business', 'old money'], 4, 260),
+  W('Blazer marine', 'veste', 'Zara', '#1c2b4a', 'Laine', ALL, ['classique', 'business'], 4, 90),
+  W('Trench beige', 'manteau', 'Burberry', '#cdb994', 'Coton', ['printemps', 'automne'], ['old money', 'classique'], 4, 1400),
+  W('Manteau long camel', 'manteau', 'Max Mara', '#b58a56', 'Laine', ['hiver'], ['old money', 'classique'], 4, 900),
+  W('Ballerines noires', 'ballerines', 'Repetto', '#161616', 'Cuir', ALL, ['classique'], 3, 250),
+  W('Escarpins noirs', 'escarpins', 'Zara', '#161616', 'Cuir', ALL, ['soiree', 'business'], 5, 60),
+  W('Baskets blanches', 'baskets', 'Veja', '#f6f4ee', 'Cuir', ALL, ['casual'], 2, 140),
+  W('Bottines marron', 'bottines', 'Sézane', '#5e4331', 'Cuir', ['automne', 'hiver'], ['casual', 'classique'], 3, 190),
+  W('Sac en cuir marron', 'sac', 'Polène', '#5e4331', 'Cuir', ALL, ['classique'], 4, 280),
+  W('Ceinture en cuir noir', 'ceinture', 'Zara', '#161616', 'Cuir', ALL, ['classique'], 4, 25),
+]
+
 /** Jeu de pièces de démonstration (sans photo). Clairement étiquetées « Démo ». */
-export function demoGarments(): Omit<Garment, 'id' | 'createdAt'>[] {
-  return SEEDS.map((s) => ({
+export function demoGarments(gender: 'homme' | 'femme' = 'homme'): Omit<Garment, 'id' | 'createdAt'>[] {
+  return (gender === 'femme' ? SEEDS_F : SEEDS).map((s) => ({
     name: s.name,
     category: s.category,
     subcategory: s.sub,

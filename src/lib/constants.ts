@@ -1,6 +1,6 @@
 import type { CategoryId, Context, Season, Slot, Style } from '../types'
 
-export const CATEGORIES: { id: CategoryId; label: string; slot: Slot }[] = [
+export const CATEGORIES: { id: CategoryId; label: string; slot: Slot; femme?: boolean }[] = [
   { id: 'tshirt', label: 'T-shirts', slot: 'top' },
   { id: 'polo', label: 'Polos', slot: 'top' },
   { id: 'chemise', label: 'Chemises', slot: 'top' },
@@ -21,7 +21,20 @@ export const CATEGORIES: { id: CategoryId; label: string; slot: Slot }[] = [
   { id: 'montre', label: 'Montres', slot: 'accessory' },
   { id: 'sac', label: 'Sacs', slot: 'accessory' },
   { id: 'autre', label: 'Autres', slot: 'accessory' },
+  { id: 'blouse', label: 'Blouses', slot: 'top', femme: true },
+  { id: 'jupe', label: 'Jupes', slot: 'bottom', femme: true },
+  { id: 'robe', label: 'Robes', slot: 'suit', femme: true },
+  { id: 'combinaison', label: 'Combinaisons', slot: 'suit', femme: true },
+  { id: 'ensemble', label: 'Ensembles', slot: 'suit', femme: true },
+  { id: 'escarpins', label: 'Escarpins', slot: 'shoes', femme: true },
+  { id: 'ballerines', label: 'Ballerines', slot: 'shoes', femme: true },
 ]
+
+/** Catégories proposées selon le profil (les pièces féminines n'apparaissent que pour un profil femme). */
+export const categoriesFor = (g?: 'homme' | 'femme') => (g === 'femme' ? CATEGORIES : CATEGORIES.filter((c) => !c.femme))
+
+/** Pièces « d'un seul tenant » : elles remplacent haut + bas. */
+export const ONE_PIECE: CategoryId[] = ['robe', 'combinaison', 'ensemble']
 
 export const CAT_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c])) as Record<
   CategoryId,

@@ -28,7 +28,8 @@ function Welcome() {
   const { setSettings, setOnboarded } = useStore()
   const [name, setName] = useState('')
   const [loc, setLoc] = useState(false)
-  const done = () => { setSettings({ name: name.trim() }); setOnboarded() }
+  const [gender, setGender] = useState<'homme' | 'femme' | null>(null)
+  const done = () => { if (!gender) return; setSettings({ name: name.trim(), gender }); setOnboarded() }
   return (
     <div className="flex h-full flex-col justify-between px-8 pb-[calc(var(--safe-bottom)+40px)] pt-[calc(var(--safe-top)+80px)]">
       <div>
@@ -37,9 +38,10 @@ function Welcome() {
         <p className="mt-5 max-w-[320px] font-serif text-[21px] italic leading-snug text-creme/60">Chaque pièce, chaque tenue, composées avec soin.</p>
       </div>
       <div>
+        <div className="mb-3 grid grid-cols-2 gap-3">{(['homme', 'femme'] as const).map((g) => <button key={g} onClick={() => setGender(g)} className={`chip !py-3.5 text-center ${gender === g ? 'chip-on' : ''}`}>{g}</button>)}</div>
         <input className="field mb-3" placeholder="Ton prénom" value={name} onChange={(e) => setName(e.target.value)} />
         <button className="field mb-6 text-left text-creme/55" onClick={() => setLoc(true)}>{useStore.getState().settings.location?.label ?? 'Activer la météo (facultatif)'}</button>
-        <button className="btn-gold w-full" onClick={done}>Entrer</button>
+        <button className="btn-gold w-full disabled:opacity-40" disabled={!gender} onClick={done}>Entrer</button>
       </div>
       <LocationPicker open={loc} onClose={() => setLoc(false)} />
     </div>

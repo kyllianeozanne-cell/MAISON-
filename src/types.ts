@@ -4,6 +4,9 @@ export type CategoryId =
   | 'pantalon' | 'jean' | 'short' | 'costume'
   | 'chaussures' | 'baskets' | 'bottines'
   | 'accessoire' | 'ceinture' | 'montre' | 'sac' | 'autre'
+  | 'blouse' | 'robe' | 'jupe' | 'combinaison' | 'ensemble' | 'escarpins' | 'ballerines'
+
+export type Gender = 'homme' | 'femme'
 
 export type Slot = 'top' | 'bottom' | 'outer' | 'shoes' | 'accessory' | 'suit'
 
@@ -92,6 +95,7 @@ export interface Settings {
   layers?: boolean
   favBrands?: string[]
   lastBackup?: string
+  gender?: Gender
   budget?: number | null
 }
 

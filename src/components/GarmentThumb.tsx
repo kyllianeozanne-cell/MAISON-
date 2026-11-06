@@ -2,7 +2,7 @@ import { readableOn } from '../lib/colors'
 import { cx } from '../lib/utils'
 import type { CategoryId, Garment } from '../types'
 
-type Shape = 'tee' | 'shirt' | 'knit' | 'coat' | 'jacket' | 'pants' | 'shorts' | 'shoe' | 'boot' | 'belt' | 'watch' | 'bag' | 'misc'
+type Shape = 'dress' | 'skirt' | 'jumpsuit' | 'heel' | 'tee' | 'shirt' | 'knit' | 'coat' | 'jacket' | 'pants' | 'shorts' | 'shoe' | 'boot' | 'belt' | 'watch' | 'bag' | 'misc'
 
 const SHAPE: Record<CategoryId, Shape> = {
   tshirt: 'tee', polo: 'tee', chemise: 'shirt', pull: 'knit', sweat: 'knit',
@@ -10,6 +10,7 @@ const SHAPE: Record<CategoryId, Shape> = {
   pantalon: 'pants', jean: 'pants', short: 'shorts',
   chaussures: 'shoe', baskets: 'shoe', bottines: 'boot',
   ceinture: 'belt', montre: 'watch', sac: 'bag', accessoire: 'misc', autre: 'misc',
+  blouse: 'shirt', robe: 'dress', jupe: 'skirt', combinaison: 'jumpsuit', ensemble: 'jacket', escarpins: 'heel', ballerines: 'shoe',
 }
 
 const D: Record<Shape, string> = {
@@ -26,6 +27,10 @@ const D: Record<Shape, string> = {
   watch: 'M40 14h20l3 24H37Z M40 106h20l3-24H37Z M32 38h36v44H32Z',
   bag: 'M18 44h64l6 62H12Z M34 44V32a16 16 0 0 1 32 0v12',
   misc: 'M50 22l22 22-22 54-22-54Z',
+  dress: 'M38 10 34 34l-14 76h60L66 34 62 10l-12 8Z',
+  skirt: 'M30 30h40l16 80H14Z',
+  jumpsuit: 'M34 12h32l4 30-6 4 8 66H56L50 62l-6 50H28l8-66-6-4Z',
+  heel: 'M10 64c0-6 4-10 10-8l14 10c10 6 22 4 30-4l8-6c4 8 4 18 0 26l-4 8H62L58 76c-8 4-18 4-26 0v28H22V72c-6 0-12-2-12-8Z',
 }
 
 export function Silhouette({ category, color, className }: { category: CategoryId; color: string; className?: string }) {

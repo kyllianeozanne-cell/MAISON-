@@ -4,7 +4,7 @@ import { AddGarmentSheet } from '../components/AddGarment'
 import { GarmentDetail } from '../components/GarmentDetail'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { ColorDot, Empty, Header, Icon, Sheet, useDebounced, toast } from '../components/ui'
-import { CATEGORIES, CAT_BY_ID, SEASONS, STYLES, MATERIALS, slotOf } from '../lib/constants'
+import { categoriesFor, CAT_BY_ID, SEASONS, STYLES, MATERIALS, slotOf } from '../lib/constants'
 import { colorName } from '../lib/colors'
 import { demoGarments } from '../lib/demo'
 import { useStore } from '../lib/store'
@@ -83,6 +83,7 @@ function ChipGroup<T extends string>({ label, options, value, onToggle }: { labe
 
 export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void }) {
   const garments = useStore((s) => s.garments)
+  const CATEGORIES = categoriesFor(useStore((s) => s.settings.gender))
   const addGarment = useStore((s) => s.addGarment)
   const updateGarment = useStore((s) => s.updateGarment)
   const [cat, setCat] = useState<Slot | 'all'>('all')
@@ -107,7 +108,7 @@ export function Wardrobe({ onTryGarment }: { onTryGarment: (g: Garment) => void 
   const active = garments.filter((g) => g.status !== 'archived').length
 
   const loadDemo = () => {
-    demoGarments().forEach((g) => addGarment(g))
+    demoGarments(useStore.getState().settings.gender).forEach((g) => addGarment(g))
     toast('Dressing de démonstration chargé')
   }
 

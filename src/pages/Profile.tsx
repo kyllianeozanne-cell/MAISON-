@@ -3,7 +3,7 @@ import { LocationPicker } from '../components/LocationPicker'
 import { GarmentThumb } from '../components/GarmentThumb'
 import { OutfitCollage } from '../components/Look'
 import { ColorDot, Empty, Header, Icon, Segmented, Sheet, toast } from '../components/ui'
-import { CATEGORIES, CAT_BY_ID, CONTEXTS, STYLES, slotOf } from '../lib/constants'
+import { categoriesFor, CAT_BY_ID, CONTEXTS, STYLES, slotOf } from '../lib/constants'
 import { colorName, NAMED_COLORS } from '../lib/colors'
 import { serverConfigured } from '../lib/ai'
 import { processBodyPhoto } from '../lib/photo'
@@ -250,6 +250,7 @@ function Trip() {
 /* ---------- Wishlist ---------- */
 function Wish() {
   const { wishlist, garments, addWish, removeWish } = useStore()
+  const CATEGORIES = categoriesFor(useStore((s) => s.settings.gender))
   const [open, setOpen] = useState(false)
   const [f, setF] = useState({ name: '', brand: '', category: 'pull' as CategoryId, color: '#1c2b4a', price: '', url: '' })
   return (
@@ -348,6 +349,7 @@ function Settings() {
     <div>
       <Block title="Profil">
         <input className="field mb-3" placeholder="Ton prénom" value={settings.name} onChange={(e) => setSettings({ name: e.target.value })} />
+        <div className="mb-3 flex gap-2">{(['homme', 'femme'] as const).map((g) => <button key={g} onClick={() => setSettings({ gender: g })} className={cx('chip flex-1 !py-3 text-center', (settings.gender ?? 'homme') === g && 'chip-on')}>{g}</button>)}</div>
         <button className="field flex items-center justify-between text-left" onClick={() => setLoc(true)}><span>{settings.location?.label ?? 'Choisir ma localisation'}</span><Icon name="pin" size={16} /></button>
       </Block>
       <Block title="Notifications">
@@ -383,7 +385,7 @@ function Settings() {
         <div className="grid grid-cols-2 gap-3">
           <button className="btn-ghost" onClick={() => { const b = new Blob([exportData()], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `maison-${ymd()}.json`; a.click(); URL.revokeObjectURL(a.href) }}><Icon name="download" size={15} /> Exporter</button>
           <button className="btn-ghost" onClick={() => file.current?.click()}><Icon name="upload" size={15} /> Importer</button>
-          {garments.length === 0 && <button className="btn-ghost col-span-2" onClick={() => { demoGarments().forEach((g) => addGarment(g)); toast('Démo chargée') }}>Charger un dressing de démonstration</button>}
+          {garments.length === 0 && <button className="btn-ghost col-span-2" onClick={() => { demoGarments(settings.gender).forEach((g) => addGarment(g)); toast('Démo chargée') }}>Charger un dressing de démonstration</button>}
           {confirm ? <button className="btn col-span-2 border border-red-300/40 text-red-200" onClick={() => { resetAll(); setConfirm(false); toast('Données effacées') }}>Confirmer : tout effacer</button> : <button className="btn col-span-2 text-creme/45" onClick={() => setConfirm(true)}>Tout effacer</button>}
         </div>
         <input ref={file} type="file" accept="application/json" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; toast(importData(await f.text()) ? 'Import réussi' : 'Fichier invalide') }} />

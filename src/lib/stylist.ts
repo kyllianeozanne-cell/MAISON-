@@ -1,4 +1,4 @@
-import { CAT_BY_ID, slotOf, season as currentSeason } from './constants'
+import { CAT_BY_ID, ONE_PIECE, slotOf, season as currentSeason } from './constants'
 import { colorFamily, colorName, harmony, isNeutral, paletteHarmony } from './colors'
 import { isWet } from './weather'
 import { clamp, daysBetween, parseYmd, shuffle, uid, ymd } from './utils'
@@ -22,7 +22,7 @@ const BASE_WARMTH: Record<string, number> = {
   tshirt: 1, polo: 1.2, chemise: 1.3, pull: 3, sweat: 2.6,
   veste: 1.5, manteau: 3.5, blouson: 2.2,
   pantalon: 1.5, jean: 1.7, short: 0.6, costume: 3,
-  chaussures: 1, baskets: 1, bottines: 1.5,
+  chaussures: 1, baskets: 1, bottines: 1.5, blouse: 1.1, robe: 1.4, jupe: 1, combinaison: 1.5, ensemble: 2, escarpins: 0.9, ballerines: 0.9,
   accessoire: 0, ceinture: 0, montre: 0, sac: 0, autre: 0,
 }
 
@@ -92,7 +92,30 @@ function recencyDays(g: Garment, today: Date): number {
   return daysBetween(parseYmd(last), today)
 }
 
-function scoreCandidate(items: Garment[], w: Weather | null, req: StyleRequest, today: Date): Candidate {
+/* ---------- Goût de l'utilisateur, déduit de son dressing ---------- */
+
+export interface Taste { colors: Map<string, number>; styles: Map<string, number>; formality: number }
+
+/** Profil de goût : couleurs, styles et formalité pondérés par ce que la personne possède, porte souvent et met en favori. */
+export function tasteOf(garments: Garment[]): Taste {
+  const colors = new Map<string, number>()
+  const styles = new Map<string, number>()
+  let fw = 0, ws = 0
+  for (const g of garments) {
+    if (g.status === 'archived') continue
+    const w = 1 + Math.min(g.wornDates.length, 8) * 0.5 + (g.favorite ? 2 : 0)
+    const cn = colorName(g.color)
+    colors.set(cn, (colors.get(cn) ?? 0) + w)
+    g.styles.forEach((st) => styles.set(st, (styles.get(st) ?? 0) + w))
+    fw += g.formality * w
+    ws += w
+  }
+  const norm = (m: Map<string, number>) => { const mx = Math.max(1, ...m.values()); m.forEach((v, k) => m.set(k, v / mx)) }
+  norm(colors); norm(styles)
+  return { colors, styles, formality: ws ? fw / ws : 3 }
+}
+
+function scoreCandidate(items: Garment[], w: Weather | null, req: StyleRequest, today: Date, taste: Taste): Candidate {
   const s = currentSeason(today)
   const feels = w ? Math.min(w.feels, (w.feels + w.min + 2) / 2 + 1) : null // un peu de poids à la fraîcheur du matin
   const body = items.filter((g) => slotOf(g.category) !== 'accessory')
@@ -134,6 +157,8 @@ function scoreCandidate(items: Garment[], w: Weather | null, req: StyleRequest, 
   // 3) Couleurs
   const colorItems = body.map((g) => g.color)
   let colorScore = paletteHarmony(colorItems)
+  // cohérence : au plus deux familles de couleurs non neutres
+  if (new Set(colorItems.filter((c) => !isNeutral(c)).map(colorFamily)).size > 2) colorScore *= 0.75
   if (req.tone === 'oldmoney') {
     const ok = colorItems.filter((c) => isNeutral(c) || colorFamily(c) === 'earth' || /^#(1|2)[0-9a-f]/i.test(c)).length
     colorScore = colorScore * 0.7 + (ok / colorItems.length) * 0.3
@@ -179,9 +204,14 @@ function scoreCandidate(items: Garment[], w: Weather | null, req: StyleRequest, 
     const cHit = pf.colors.length ? body.filter((g) => pf.colors.includes(colorName(g.color))).length / body.length : 0.5
     prefScore = (sHit + cHit) / 2
   }
+  // goût déduit du dressing (couleurs et styles aimés, niveau de formalité habituel)
+  const tc = body.reduce((a, g) => a + (taste.colors.get(colorName(g.color)) ?? 0), 0) / Math.max(1, body.length)
+  const ts = body.reduce((a, g) => a + Math.max(0, ...g.styles.map((x) => taste.styles.get(x) ?? 0)), 0) / Math.max(1, body.length)
+  const tf = 1 - Math.min(1, Math.abs(fAvg - taste.formality) / 3)
+  const tasteScore = 0.45 * tc + 0.3 * ts + 0.25 * tf
   const score =
-    weatherScore * 0.3 + colorScore * 0.24 + formalityScore * 0.2 + seasonScore * 0.1 +
-    styleScore * 0.08 + rotation * 0.08 + prefScore * 0.08
+    weatherScore * 0.28 + colorScore * 0.26 + formalityScore * 0.18 + seasonScore * 0.08 +
+    styleScore * 0.07 + rotation * 0.06 + prefScore * 0.07 + tasteScore * 0.12
   return { items, score: score * (0.6 + 0.4 * novelty), weatherScore, colorScore, formalityScore, seasonScore }
 }
 
@@ -197,6 +227,7 @@ export function buildCandidates(garments: Garment[], w: Weather | null, req: Sty
   const wantOuter = feels < 15 || (feels < 19 && (isWet(w) || req.context === 'travail' || req.context === 'soiree'))
   const allowOuter = feels < 24 || req.context === 'soiree' || req.context === 'travail'
 
+  const taste = tasteOf(garments)
   const out = new Map<string, Candidate>()
   const pickFrom = (slot: Slot): Garment | undefined => {
     if (mustBySlot[slot].length) return mustBySlot[slot][0]
@@ -205,13 +236,20 @@ export function buildCandidates(garments: Garment[], w: Weather | null, req: Sty
   }
 
   for (let i = 0; i < tries; i++) {
-    const useSuit = slots.suit.length > 0 && (mustBySlot.suit.length > 0 || (Math.random() < 0.18 && req.context !== 'weekend' && req.context !== 'vacances'))
+    const onePieces = slots.suit.filter((g) => ONE_PIECE.includes(g.category))
+    const suitRate = onePieces.length ? 0.3 : 0.18
+    let suit: Garment | undefined
+    if (mustBySlot.suit.length) suit = mustBySlot.suit[0]
+    else if (slots.suit.length && Math.random() < suitRate) {
+      suit = pickFrom('suit')
+      if (suit && suit.category === 'costume' && (req.context === 'weekend' || req.context === 'vacances')) suit = undefined
+    }
     let items: (Garment | undefined)[] = []
-    if (useSuit && !mustBySlot.top.length && !mustBySlot.bottom.length) {
-      const suit = pickFrom('suit')
-      const shirt = pickFrom('top')
-      const shoes = pickFrom('shoes')
-      items = [suit, shirt, shoes]
+    if (suit && !mustBySlot.top.length && !mustBySlot.bottom.length) {
+      if (ONE_PIECE.includes(suit.category)) {
+        const outer = mustBySlot.outer[0] ?? (allowOuter && slots.outer.length && (wantOuter || Math.random() < 0.3) ? pickFrom('outer') : undefined)
+        items = [suit, outer, pickFrom('shoes')]
+      } else items = [suit, pickFrom('top'), pickFrom('shoes')]
     } else {
       const top = pickFrom('top')
       const bottom = pickFrom('bottom')
@@ -235,9 +273,12 @@ export function buildCandidates(garments: Garment[], w: Weather | null, req: Sty
     }
     const key = clean.map((g) => g.id).sort().join('|')
     if (out.has(key)) continue
-    out.set(key, scoreCandidate(clean, w, req, today))
+    out.set(key, scoreCandidate(clean, w, req, today, taste))
   }
-  return [...out.values()].sort((a, b) => b.score - a.score)
+  const all = [...out.values()].sort((a, b) => b.score - a.score)
+  // les couleurs doivent rester cohérentes : on écarte les palettes disparates tant qu'il reste assez de choix
+  const coherent = all.filter((c) => c.colorScore >= 0.62)
+  return coherent.length >= 3 ? coherent : all
 }
 
 /* ---------- Explication ---------- */
@@ -301,11 +342,19 @@ export function suggest(garments: Garment[], w: Weather | null, req: StyleReques
   const cands = buildCandidates(garments, w, req)
   const count = req.count ?? 1
   const picked: Candidate[] = []
-  for (const c of cands) {
-    // diversité : on évite des tenues qui partagent trop de pièces avec celles déjà retenues
+  // variété : tirage pondéré parmi les meilleures tenues restantes (au lieu de toujours la première)
+  let pool = cands.slice(0, 40)
+  while (picked.length < count && pool.length) {
+    const head = pool.slice(0, 6)
+    const top = head[0].score
+    const wts = head.map((c) => Math.exp((c.score - top) * 14))
+    let r = Math.random() * wts.reduce((x, y) => x + y, 0)
+    let idx = 0
+    for (; idx < head.length - 1; idx++) { r -= wts[idx]; if (r <= 0) break }
+    const c = pool[idx]
+    pool = pool.filter((_, i) => i !== idx)
     const tooClose = picked.some((p) => c.items.filter((g) => p.items.some((q) => q.id === g.id)).length >= Math.max(2, c.items.length - 1))
     if (!tooClose) picked.push(c)
-    if (picked.length >= count) break
   }
   return picked.map((c) => ({
     id: uid(),
@@ -465,6 +514,7 @@ const REF_WORDS: [RegExp, CategoryId[], string][] = [
   [/\bpull\b/, ['pull'], 'pull'], [/chemise/, ['chemise'], 'chemise'], [/\bpolo/, ['polo'], 'polo'],
   [/t-?shirt|tee-?shirt/, ['tshirt'], 't-shirt'], [/sweat/, ['sweat'], 'sweat'], [/pantalon|chino/, ['pantalon'], 'pantalon'],
   [/\bjean/, ['jean'], 'jean'], [/\bshort/, ['short'], 'short'], [/costume/, ['costume'], 'costume'],
+  [/robe/, ['robe'], 'robe'], [/jupe/, ['jupe'], 'jupe'], [/combinaison/, ['combinaison'], 'combinaison'], [/ensemble|tailleur/, ['ensemble'], 'ensemble'], [/escarpin|talon/, ['escarpins'], 'escarpins'], [/ballerine/, ['ballerines'], 'ballerines'], [/blouse/, ['blouse'], 'blouse'],
   [/chaussures|mocassin|derby/, ['chaussures'], 'chaussures'], [/basket|sneaker/, ['baskets'], 'baskets'], [/bottine|boots?/, ['bottines'], 'bottines'],
 ]
 

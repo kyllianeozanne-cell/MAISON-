@@ -16,10 +16,10 @@ export function aiMode(s: { aiEnabled: boolean; aiKey?: string }): 'direct' | 's
 }
 
 const SYSTEM =
-  'Tu es le styliste personnel d’un homme au goût sûr. Tu composes des tenues UNIQUEMENT avec les pièces de la liste fournie, en utilisant leurs identifiants exacts. ' +
+  'Tu es le styliste personnel d’une personne au goût sûr (homme ou femme, selon son profil). Tu composes des tenues UNIQUEMENT avec les pièces de la liste fournie, en utilisant leurs identifiants exacts. ' +
   'N’invente aucune pièce. Tiens compte de la météo, de la saison, des couleurs, de la formalité, des préférences et des pièces peu portées. ' +
   'Réponds uniquement par un JSON strict : {"title": string, "message": string (2 à 3 phrases en français qui expliquent les associations), "itemIds": string[]} ' +
-  'avec un haut, un bas (ou un costume), des chaussures, éventuellement une veste et un accessoire.'
+  'avec un haut et un bas (ou une pièce d’un seul tenant : costume, robe, combinaison, ensemble), des chaussures, éventuellement une veste et un accessoire. Les couleurs doivent être cohérentes entre elles : pas plus de deux familles de couleurs non neutres.'
 
 interface Opts { apiKey?: string; prefs?: Settings; mustInclude?: string[]; avoid?: string[] }
 

@@ -5,9 +5,9 @@ import { GarmentThumb } from '../components/GarmentThumb'
 import type { Tab } from '../components/NavBar'
 import { readableOn } from '../lib/colors'
 import { ColorDot, Empty, Header, Icon, Sheet, toast } from '../components/ui'
-import { MERCHANTS, useCatalog, type Product } from '../lib/catalog'
+import { BRANDS, MERCHANTS, imagesUrl, useCatalog, type Product } from '../lib/catalog'
 import { dominantColor, processPhoto } from '../lib/photo'
-import { CATEGORIES, SLOT_LABEL, slotOf } from '../lib/constants'
+import { categoriesFor, SLOT_LABEL, slotOf } from '../lib/constants'
 import { NAMED_COLORS, colorName } from '../lib/colors'
 import { SECTIONS, buildNeeds, matchProducts, ownStyles, pairsFor, type Need } from '../lib/selection'
 import { useStore } from '../lib/store'
@@ -195,7 +195,15 @@ function Detail({ n, garments, products, brand, fav, onFav, onTry }: { n: Need; 
   const target: Garment = useMemo(() => ({ id: 'sel-target', name: n.title, category: n.cat, subcategory: '', brand: '', color: n.color, secondaryColors: [], material: '', size: '', seasons: [], styles: [], formality: 3, purchaseDate: '', price: null, notes: '', photo: '', wornDates: [], status: 'available', createdAt: 0 }), [n])
   const { pairs, coverage } = useMemo(() => pairsFor(n.cat, n.color, 3, garments), [n, garments])
   const lookItems = [target, ...pairs.filter((g) => slotOf(g.category) !== slotOf(n.cat))]
-  const q = `${n.noun} ${n.colorName}`
+  const sex = useStore((st) => st.settings.gender) ?? 'homme'
+  const q = `${n.noun} ${n.colorName} ${sex}`
+  const mine = useStore((st) => st.settings.favStyles) ?? []
+  const inspo = useMemo(() => {
+    const own = [...mine, ...n.styles]
+    const out: string[] = []
+    for (const st of own) for (const b of BRANDS[st]?.[sex] ?? []) if (!out.includes(b)) out.push(b)
+    return out.slice(0, 6)
+  }, [mine, n.styles, sex])
   return (
     <div>
       <LookBoard items={lookItems} className="mx-auto mb-2 w-[78%]" />
@@ -231,12 +239,23 @@ function Detail({ n, garments, products, brand, fav, onFav, onTry }: { n: Need; 
         </>
       )}
 
-      <div className="caps mb-3">Chercher chez un marchand</div>
-      <div className="mb-6 flex flex-wrap gap-2">
-        {MERCHANTS.map((m) => <a key={m.id} href={m.url(q)} target="_blank" rel="noopener noreferrer" className="chip">{m.label}</a>)}
-        {brand && <a href={MERCHANTS[0].url(`${brand} ${q}`)} target="_blank" rel="noopener noreferrer" className="chip chip-on">{brand}</a>}
+      <div className="caps mb-3">Voir des images de vêtements</div>
+      <div className="mb-5 flex flex-wrap gap-2">
+        {MERCHANTS.slice(0, 4).map((m) => <a key={m.id} href={imagesUrl(q, m.site)} target="_blank" rel="noopener noreferrer" className="chip">{m.label}</a>)}
+        <a href={imagesUrl(q)} target="_blank" rel="noopener noreferrer" className="chip chip-on">Tous les sites</a>
       </div>
-      <p className="mb-6 text-[10.5px] leading-relaxed text-creme/35">Liens de recherche : prix et disponibilités sont ceux du marchand.</p>
+      <div className="caps mb-3">Chercher en boutique</div>
+      <div className="mb-5 flex flex-wrap gap-2">
+        {MERCHANTS.filter((m) => m.url).map((m) => <a key={m.id} href={m.url!(q)} target="_blank" rel="noopener noreferrer" className="chip">{m.label}</a>)}
+        {brand && <a href={imagesUrl(`${brand} ${q}`)} target="_blank" rel="noopener noreferrer" className="chip chip-on">{brand}</a>}
+      </div>
+      {inspo.length > 0 && (
+        <>
+          <div className="caps mb-3">Marques dans ton esprit</div>
+          <div className="mb-5 flex flex-wrap gap-2">{inspo.map((b) => <a key={b} href={imagesUrl(`${b} ${q}`)} target="_blank" rel="noopener noreferrer" className="chip">{b}</a>)}</div>
+        </>
+      )}
+      <p className="mb-6 text-[10.5px] leading-relaxed text-creme/35">Ce sont des liens de recherche : prix et disponibilité sont ceux du marchand. Les images s’ouvrent dans Google Images.</p>
 
       <div className="grid grid-cols-2 gap-3">
         <button className="btn-ghost" onClick={onFav}><Icon name="heart" size={15} className={fav ? 'fill-champagne' : ''} /> {fav ? 'Favori' : 'Ajouter aux favoris'}</button>
@@ -248,6 +267,7 @@ function Detail({ n, garments, products, brand, fav, onFav, onTry }: { n: Need; 
 
 function AddItem({ open, onClose }: { open: boolean; onClose: () => void }) {
   const addShopItem = useStore((s) => s.addShopItem)
+  const CATEGORIES = categoriesFor(useStore((s) => s.settings.gender))
   const file = useRef<HTMLInputElement>(null)
   const [image, setImage] = useState('')
   const [color, setColor] = useState('#8b8b8b')

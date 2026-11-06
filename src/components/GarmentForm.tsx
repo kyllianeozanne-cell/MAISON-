@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { CATEGORIES, FORMALITY_LABEL, MATERIALS, SEASONS, STYLES } from '../lib/constants'
+import { categoriesFor, FORMALITY_LABEL, MATERIALS, SEASONS, STYLES } from '../lib/constants'
 import { NAMED_COLORS, colorName } from '../lib/colors'
+import { useStore } from '../lib/store'
 import { cx } from '../lib/utils'
 import { GarmentThumb } from './GarmentThumb'
 import { ColorDot, Field } from './ui'
@@ -35,6 +36,7 @@ export function GarmentForm({
   initial, submitLabel, onSubmit, onCancel,
 }: { initial: GarmentDraft; submitLabel: string; onSubmit: (d: GarmentDraft) => void; onCancel?: () => void }) {
   const [d, setD] = useState<GarmentDraft>(initial)
+  const CATEGORIES = categoriesFor(useStore((s) => s.settings.gender))
   const [err, setErr] = useState('')
   const set = <K extends keyof GarmentDraft>(k: K, v: GarmentDraft[K]) => setD((p) => ({ ...p, [k]: v }))
 

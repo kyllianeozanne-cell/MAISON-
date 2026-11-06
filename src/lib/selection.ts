@@ -23,6 +23,7 @@ interface Tpl {
   formality: number
   essential?: boolean
   disc?: boolean
+  sex?: 'homme' | 'femme' // absent = mixte
   gap: (c: Ctx) => number // 0 (rien ne manque) → 1 (indispensable)
 }
 
@@ -48,10 +49,20 @@ const TPL: Tpl[] = [
   { id: 'ceinture', cat: 'ceinture', noun: 'Ceinture en cuir', g: 'f', colors: ['Marron', 'Noir'], styles: ['classique', 'business', 'old money'], formality: 4, essential: true, gap: none('ceinture') },
   { id: 'montre', cat: 'montre', noun: 'Montre sobre', g: 'f', colors: ['Anthracite', 'Marron'], styles: ['classique', 'business', 'old money'], formality: 4, gap: none('montre') },
   { id: 'tshirt', cat: 'tshirt', noun: 'T-shirt en coton épais', g: 'm', colors: ['Blanc', 'Noir', 'Gris'], styles: ['casual', 'streetwear', 'sportif'], formality: 1, essential: true, gap: few(3, 0.75, 'tshirt') },
-  { id: 'polo', cat: 'polo', noun: 'Polo en maille', g: 'm', colors: ['Marine', 'Écru'], styles: ['old money', 'classique', 'casual'], formality: 3, gap: none('polo') },
+  { id: 'polo', sex: 'homme', cat: 'polo', noun: 'Polo en maille', g: 'm', colors: ['Marine', 'Écru'], styles: ['old money', 'classique', 'casual'], formality: 3, gap: none('polo') },
   { id: 'sweat', cat: 'sweat', noun: 'Sweat épais', g: 'm', colors: ['Gris', 'Anthracite', 'Marine'], styles: ['casual', 'streetwear', 'sportif'], formality: 1, gap: none('sweat') },
   { id: 'sac', cat: 'sac', noun: 'Sac en cuir', g: 'm', colors: ['Marron', 'Noir'], styles: ['classique', 'business'], formality: 4, gap: none('sac') },
-  { id: 'costume', cat: 'costume', noun: 'Costume', g: 'm', colors: ['Marine', 'Anthracite'], styles: ['business', 'soiree', 'classique'], formality: 5, gap: none('costume') },
+  { id: 'costume', sex: 'homme', cat: 'costume', noun: 'Costume', g: 'm', colors: ['Marine', 'Anthracite'], styles: ['business', 'soiree', 'classique'], formality: 5, gap: none('costume') },
+  // Pièces féminines
+  { id: 'blouse', sex: 'femme', cat: 'blouse', noun: 'Blouse fluide', g: 'f', colors: ['Blanc', 'Écru', 'Bleu ciel'], styles: ['classique', 'business', 'old money'], formality: 4, essential: true, gap: none('blouse', 'chemise') },
+  { id: 'robe-noire', sex: 'femme', cat: 'robe', noun: 'Petite robe', g: 'f', colors: ['Noir', 'Marine', 'Bordeaux'], styles: ['soiree', 'classique'], formality: 4, essential: true, gap: none('robe') },
+  { id: 'robe-midi', sex: 'femme', cat: 'robe', noun: 'Robe midi', g: 'f', colors: ['Camel', 'Écru', 'Vert'], styles: ['casual', 'old money', 'classique'], formality: 3, gap: few(2, 0.5, 'robe') },
+  { id: 'jupe', sex: 'femme', cat: 'jupe', noun: 'Jupe plissée', g: 'f', colors: ['Noir', 'Camel', 'Marine'], styles: ['classique', 'old money', 'casual'], formality: 3, essential: true, gap: none('jupe') },
+  { id: 'combinaison', sex: 'femme', cat: 'combinaison', noun: 'Combinaison', g: 'f', colors: ['Noir', 'Kaki', 'Marine'], styles: ['soiree', 'classique', 'casual'], formality: 4, gap: none('combinaison') },
+  { id: 'tailleur', sex: 'femme', cat: 'ensemble', noun: 'Ensemble tailleur', g: 'm', colors: ['Anthracite', 'Beige', 'Noir'], styles: ['business', 'classique', 'old money'], formality: 4, essential: true, gap: none('ensemble', 'costume') },
+  { id: 'escarpins', sex: 'femme', cat: 'escarpins', noun: 'Escarpins', g: 'm', pl: true, colors: ['Noir', 'Beige', 'Bordeaux'], styles: ['soiree', 'classique', 'business'], formality: 5, essential: true, gap: none('escarpins') },
+  { id: 'ballerines', sex: 'femme', cat: 'ballerines', noun: 'Ballerines', g: 'f', pl: true, colors: ['Noir', 'Beige', 'Bordeaux'], styles: ['classique', 'casual', 'old money'], formality: 3, gap: none('ballerines') },
+  { id: 'ensemble-maille', sex: 'femme', cat: 'ensemble', noun: 'Ensemble en maille', g: 'm', colors: ['Écru', 'Gris', 'Camel'], styles: ['casual', 'old money'], formality: 3, disc: true, gap: () => 0.4 },
   // Découvertes
   { id: 'd-trench', cat: 'manteau', noun: 'Trench', g: 'm', colors: ['Beige', 'Camel'], styles: ['old money', 'classique'], formality: 4, disc: true, gap: (x) => (x.all.some((g) => g.category === 'manteau' && g.formality >= 4) ? 0.5 : 0.35) },
   { id: 'd-roule', cat: 'pull', noun: 'Pull col roulé fin', g: 'm', colors: ['Écru', 'Noir', 'Camel'], styles: ['classique', 'old money', 'soiree'], formality: 3, disc: true, gap: () => 0.4 },
@@ -135,8 +146,9 @@ export function buildNeeds(garments: Garment[], s: Settings): Need[] {
   const avoid = s.avoid ?? []
   const out: Need[] = []
 
+  const sex = s.gender ?? 'homme'
   for (const t of TPL) {
-    if (avoid.includes(t.cat)) continue
+    if (avoid.includes(t.cat) || (t.sex && t.sex !== sex)) continue
     const gap = t.gap(ctx)
     if (gap < 0.3) continue
     const owned = ctx.colorsIn(t.cat)
