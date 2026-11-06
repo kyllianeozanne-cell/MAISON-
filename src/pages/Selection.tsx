@@ -157,6 +157,8 @@ export function Selection({ go, tryLook }: { go: (t: Tab) => void; tryLook: (l: 
 
 function NeedCard({ n, products, fav, onFav, onOpen }: { n: Need; products: Product[]; fav: boolean; onFav: () => void; onOpen: () => void }) {
   const p = products[0]
+  const sex = useStore((st) => st.settings.gender) ?? 'homme'
+  const q = `${n.noun} ${n.colorName} ${sex}`
   return (
     <motion.article initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="card w-[78%] max-w-[320px] shrink-0 snap-start overflow-hidden">
       <button onClick={onOpen} className="block w-full text-left">
@@ -185,7 +187,10 @@ function NeedCard({ n, products, fav, onFav, onOpen }: { n: Need; products: Prod
           <button onClick={onFav} aria-label="Favori" className={cx('p-1', fav ? 'text-champagne' : 'text-creme/35')}><Icon name="heart" size={20} className={fav ? 'fill-champagne' : ''} /></button>
         </div>
         <p className="mt-3 line-clamp-4 text-[12px] leading-relaxed text-creme/60">{n.why}</p>
-        <button onClick={onOpen} className="btn-ghost mt-4 w-full !py-2.5">Voir le détail</button>
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {MERCHANTS.slice(0, 4).map((m) => <a key={m.id} href={imagesUrl(q, m.site)} target="_blank" rel="noopener noreferrer" className="rounded-full border border-champagne/30 px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] text-champagne">{m.label}</a>)}
+        </div>
+        <button onClick={onOpen} className="btn-ghost mt-3 w-full !py-2.5">Voir le détail</button>
       </div>
     </motion.article>
   )
