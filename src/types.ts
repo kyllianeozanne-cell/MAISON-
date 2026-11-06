@@ -32,6 +32,7 @@ export interface Garment {
   price: number | null
   notes: string
   photo: string // data URL (peut être vide)
+  original?: string // photo d'origine, conservée pour pouvoir re-détourer
   wornDates: string[]
   status: Status
   favorite?: boolean

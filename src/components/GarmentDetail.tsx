@@ -4,6 +4,7 @@ import { GarmentThumb } from './GarmentThumb'
 import { ColorDot, Icon, Sheet, toast } from './ui'
 import { CAT_BY_ID, FORMALITY_LABEL } from '../lib/constants'
 import { colorName } from '../lib/colors'
+import { enhanceGarment } from '../lib/enhance'
 import { useStore } from '../lib/store'
 import { daysBetween, eur, parseYmd, ymd } from '../lib/utils'
 import type { Garment } from '../types'
@@ -20,6 +21,7 @@ export function GarmentDetail({ garment, onClose, onTry }: { garment: Garment | 
   const { updateGarment, removeGarment, setStatus, logOutfit } = useStore()
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [cutting, setCutting] = useState(false)
 
   const close = () => { setEditing(false); setConfirmDelete(false); onClose() }
   const g = garment
@@ -73,6 +75,12 @@ export function GarmentDetail({ garment, onClose, onTry }: { garment: Garment | 
             <button className="btn-ghost" onClick={() => { logOutfit(ymd(), Array.from(new Set([...(useStore.getState().calendar.find((e) => e.date === ymd() && !e.planned)?.itemIds ?? []), g.id]))); toast('Ajoutée à la tenue du jour') }}>
               <Icon name="check" size={16} /> Portée aujourd’hui
             </button>
+            {g.photo && (
+              <button className="btn-ghost col-span-2" disabled={cutting} onClick={async () => { setCutting(true); toast('Détourage en cours…'); const r = await enhanceGarment(g.id); setCutting(false); toast(r === 'smart' ? 'Détourage terminé' : r === 'basic' ? 'Détourage simple appliqué (modèle indisponible)' : 'Détourage impossible sur cette photo') }}>
+                <Icon name="sparkle" size={16} /> {cutting ? 'Détourage…' : 'Détourer sur fond crème'}
+              </button>
+            )}
+            {g.original && g.photo !== g.original && <button className="btn-ghost col-span-2" onClick={() => { updateGarment(g.id, { photo: g.original as string }); toast('Photo d’origine rétablie') }}>Rétablir la photo d’origine</button>}
             <button className="btn-ghost" onClick={() => setEditing(true)}><Icon name="edit" size={16} /> Modifier</button>
             <button className="btn-ghost" onClick={() => { setStatus(g.id, g.status === 'laundry' ? 'available' : 'laundry'); toast(g.status === 'laundry' ? 'De nouveau disponible' : 'Marquée au lavage') }}>
               <Icon name="drop" size={16} /> {g.status === 'laundry' ? 'Disponible' : 'Au lavage'}

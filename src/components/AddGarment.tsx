@@ -3,6 +3,7 @@ import { emptyDraft, GarmentForm, type GarmentDraft } from './GarmentForm'
 import { Icon, Sheet, Spinner, toast } from './ui'
 import { colorName } from '../lib/colors'
 import { dominantColor, processPhoto } from '../lib/photo'
+import { enhanceGarment } from '../lib/enhance'
 import { useStore } from '../lib/store'
 import { cx } from '../lib/utils'
 
@@ -29,7 +30,7 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
       const out: QueueItem[] = []
       for (const f of Array.from(files).slice(0, 20)) {
         if (!f.type.startsWith('image/')) continue
-        const photo = await processPhoto(f, { cutout })
+        const photo = await processPhoto(f, { cutout: false })
         const color = await dominantColor(photo).catch(() => '#8b8b8b')
         out.push({ photo, color })
       }
@@ -43,7 +44,8 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
   }
 
   const onSubmit = (d: GarmentDraft) => {
-    addGarment(d)
+    const id = addGarment(d)
+    if (cutout && d.photo) enhanceGarment(id).then((r) => { if (r === 'smart') toast('Détourage terminé'); else if (r === 'basic') toast('Détourage simple appliqué') })
     if (queue && index < queue.length - 1) {
       toast(`Pièce ajoutée · ${index + 1}/${queue.length}`)
       setIndex(index + 1)
@@ -77,8 +79,8 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
             className="mb-6 flex w-full items-center justify-between rounded-xl border border-white/10 px-4 py-3.5 text-left"
           >
             <span>
-              <span className="block text-[13px] text-ivoire">Détourer le fond</span>
-              <span className="block text-[11px] text-creme/45">Efficace sur fond uni (mur, sol). Sinon, fond neutre.</span>
+              <span className="block text-[13px] text-ivoire">Détourage intelligent sur fond crème</span>
+              <span className="block text-[11px] text-creme/45">Isole le vêtement, même porté. Au premier usage, un modèle (~30 Mo) est téléchargé : mieux vaut le Wi-Fi.</span>
             </span>
             <span className={cx('flex h-6 w-11 items-center rounded-full px-0.5 transition', cutout ? 'bg-champagne' : 'bg-white/10')}>
               <span className={cx('h-5 w-5 rounded-full bg-noir transition-transform', cutout && 'translate-x-5 bg-noir')} />

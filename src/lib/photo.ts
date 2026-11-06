@@ -1,3 +1,4 @@
+import type { CategoryId } from '../types'
 import { hexToRgb } from './colors'
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -184,4 +185,88 @@ export async function cutoutDataUrl(src: string): Promise<string> {
   o.height = bh
   o.getContext('2d')!.drawImage(c, x0, y0, bw, bh, 0, 0, bw, bh)
   return o.toDataURL('image/png')
+}
+
+/* ---------- Détourage intelligent (segmentation de vêtements, dans le navigateur) ---------- */
+
+const SEG_LABELS: Partial<Record<CategoryId, string[]>> = {
+  tshirt: ['upper-clothes'], polo: ['upper-clothes'], chemise: ['upper-clothes'], pull: ['upper-clothes'], sweat: ['upper-clothes'], blouse: ['upper-clothes'],
+  veste: ['upper-clothes'], manteau: ['upper-clothes'], blouson: ['upper-clothes'],
+  pantalon: ['pants'], jean: ['pants'], short: ['pants'], jupe: ['skirt'],
+  costume: ['upper-clothes', 'pants', 'skirt', 'dress'], robe: ['dress', 'upper-clothes', 'skirt'], combinaison: ['upper-clothes', 'pants', 'dress'], ensemble: ['upper-clothes', 'pants', 'skirt', 'dress'],
+  chaussures: ['left-shoe', 'right-shoe'], baskets: ['left-shoe', 'right-shoe'], bottines: ['left-shoe', 'right-shoe'], escarpins: ['left-shoe', 'right-shoe'], ballerines: ['left-shoe', 'right-shoe'],
+  sac: ['bag'], ceinture: ['belt'],
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let segPromise: Promise<any> | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSegmenter(): Promise<any> {
+  segPromise ??= (async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tf = (await import('@huggingface/transformers')) as any
+    tf.env.allowLocalModels = false
+    return tf.pipeline('image-segmentation', 'Xenova/segformer_b2_clothes', { dtype: 'q8' })
+  })().catch((e) => { segPromise = null; throw e })
+  return segPromise
+}
+
+/**
+ * Isole le vêtement (même porté) avec un modèle de segmentation, puis le place sur fond crème, recadré.
+ * Retourne null si le modèle est indisponible ou ne trouve pas la pièce : l'appelant utilise alors le détourage simple.
+ */
+export async function smartCutout(src: string, category: CategoryId): Promise<string | null> {
+  const labels = SEG_LABELS[category]
+  if (!labels) return null
+  try {
+    const seg = await getSegmenter()
+    const res: { label: string; mask: { data: ArrayLike<number>; width: number; height: number; channels?: number } }[] = await seg(src)
+    const picked = res.filter((r) => labels.includes(String(r.label).toLowerCase()))
+    if (!picked.length) return null
+    const mw = picked[0].mask.width, mh = picked[0].mask.height, ch = picked[0].mask.channels ?? 1
+    const mc = document.createElement('canvas')
+    mc.width = mw; mc.height = mh
+    const mctx = mc.getContext('2d')!
+    const md = mctx.createImageData(mw, mh)
+    for (let i = 0; i < mw * mh; i++) {
+      let v = 0
+      for (const r of picked) v = Math.max(v, r.mask.data[i * ch])
+      md.data[i * 4] = 255; md.data[i * 4 + 1] = 255; md.data[i * 4 + 2] = 255
+      md.data[i * 4 + 3] = v > 128 ? 255 : 0
+    }
+    mctx.putImageData(md, 0, 0)
+
+    const img = await loadImage(src)
+    const scale = Math.min(1, 900 / Math.max(img.width, img.height))
+    const w = Math.round(img.width * scale), h = Math.round(img.height * scale)
+    const c = document.createElement('canvas')
+    c.width = w; c.height = h
+    const ctx = c.getContext('2d', { willReadFrequently: true })!
+    ctx.drawImage(img, 0, 0, w, h)
+    ctx.globalCompositeOperation = 'destination-in'
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(mc, 0, 0, w, h)
+
+    const px = ctx.getImageData(0, 0, w, h).data
+    let x0 = w, y0 = h, x1 = 0, y1 = 0, n = 0
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (px[(y * w + x) * 4 + 3] > 100) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+    }
+    const cover = n / (w * h)
+    if (cover < 0.02 || x1 <= x0 || y1 <= y0) return null
+
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1
+    const OW = 800, OH = 1000, pad = 0.08
+    const out = document.createElement('canvas')
+    out.width = OW; out.height = OH
+    const octx = out.getContext('2d')!
+    octx.fillStyle = '#f3eee4'
+    octx.fillRect(0, 0, OW, OH)
+    const s = Math.min((OW * (1 - 2 * pad)) / bw, (OH * (1 - 2 * pad)) / bh)
+    octx.imageSmoothingQuality = 'high'
+    octx.drawImage(c, x0, y0, bw, bh, (OW - bw * s) / 2, (OH - bh * s) / 2, bw * s, bh * s)
+    return out.toDataURL('image/jpeg', 0.9)
+  } catch {
+    return null
+  }
 }

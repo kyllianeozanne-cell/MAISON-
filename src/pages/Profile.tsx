@@ -14,6 +14,7 @@ import { useStore } from '../lib/store'
 import { fetchTripWeather } from '../lib/weather'
 import { bilan, challenge, costPerWear, countOutfits } from '../lib/insights'
 import { planWeek } from '../lib/planner'
+import { enhanceGarment } from '../lib/enhance'
 import { cx, eur, parseYmd, ymd } from '../lib/utils'
 import type { CategoryId, Context, Garment, GeoPoint } from '../types'
 
@@ -329,6 +330,7 @@ function Settings() {
   const [confirm, setConfirm] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
+  const [bulk, setBulk] = useState('')
   const backup = async () => {
     const f = new File([exportData()], `maison-${ymd()}.json`, { type: 'application/json' })
     try {
@@ -375,6 +377,15 @@ function Settings() {
         <p className="mt-3 text-[11px] leading-relaxed text-creme/40">
           Sans IA, le styliste est un moteur de règles (couleurs, météo, formalité) : utile, mais ce n’est pas de l’IA. Avec ta propre clé Anthropic, le nom, la catégorie, la couleur et la matière de tes pièces sont envoyés à Claude, jamais les photos. La clé reste sur cet appareil et chaque appel est facturé sur ton compte Anthropic.{serverConfigured && !settings.aiKey ? ' Une fonction serveur est détectée et sera utilisée.' : ''}
         </p>
+      </Block>
+      <Block title="Photos des vêtements">
+        <p className="mb-4 text-[11.5px] leading-relaxed text-creme/45">Re-détoure toutes tes pièces sur fond crème avec le modèle intelligent. Premier lancement : téléchargement d’environ 30 Mo, puis quelques secondes par pièce. Garde l’app ouverte.</p>
+        <button className="btn-gold w-full" disabled={bulk !== ''} onClick={async () => {
+          const list = garments.filter((g) => g.photo)
+          let ok = 0
+          for (let i = 0; i < list.length; i++) { setBulk(`${i + 1} / ${list.length}`); if (await enhanceGarment(list[i].id)) ok++ }
+          setBulk(''); toast(`${ok} photo${ok > 1 ? 's' : ''} détourée${ok > 1 ? 's' : ''}`)
+        }}><Icon name="sparkle" size={15} /> {bulk ? `Détourage ${bulk}` : 'Détourer toutes mes pièces'}</button>
       </Block>
       <Block title="Sauvegarde">
         <p className="mb-4 text-[11.5px] leading-relaxed text-creme/45">Tout est stocké sur cet appareil. Enregistre une copie dans Fichiers (iCloud) pour ne rien perdre si tu changes de téléphone.{settings.lastBackup ? ` Dernière sauvegarde : ${settings.lastBackup}.` : ''}</p>
